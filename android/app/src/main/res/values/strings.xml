@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TryHard Academy</string>
+    <string name="title_activity_main">TryHard Academy</string>
+    <string name="package_name">com.tryhard.academy</string>
+    <string name="custom_url_scheme">com.tryhard.academy</string>
+</resources>

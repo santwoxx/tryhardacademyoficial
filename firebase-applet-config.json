@@ -1,0 +1,11 @@
+{
+  "projectId": "tryhard-academy-59e76",
+  "appId": "1:378020596434:web:6ec1e1ccbc4fb26c50fb0b",
+  "apiKey": "AIzaSyAnrVBhSx-3XLwxvyFlPs4TBPEScWiTSK0",
+  "authDomain": "tryhard-academy-59e76.firebaseapp.com",
+  "databaseURL": "https://tryhard-academy-59e76-default-rtdb.firebaseio.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "tryhard-academy-59e76.firebasestorage.app",
+  "messagingSenderId": "378020596434",
+  "measurementId": "G-QZ1YWETCDM"
+}
