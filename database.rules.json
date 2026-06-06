@@ -1,6 +1,7 @@
 {
   "rules": {
     "players": {
+      ".read": "auth != null",
       ".indexOn": ["trophies", "teacherId", "role"],
       "$uid": {
         // Simple owner-based read/write
@@ -48,6 +49,7 @@
       }
     },
     "rooms": {
+      ".read": "auth != null",
       ".indexOn": ["status"],
       "$roomId": {
         ".read": "auth != null",

@@ -36,8 +36,7 @@ service cloud.firestore {
       return data.keys().hasAll(['text', 'uid', 'nickname', 'timestamp']) &&
         data.text is string && data.text.size() > 0 && data.text.size() <= 200 &&
         data.uid == request.auth.uid &&
-        data.nickname is string && data.nickname.size() >= 1 &&
-        data.timestamp == request.time;
+        data.nickname is string && data.nickname.size() >= 1;
     }
 
     function isOwner(uid) {
@@ -62,25 +61,20 @@ service cloud.firestore {
     // Players (CRÍTICO - LEADERBOARD)
     // ===============================================================
 
-    match /players {
+    match /players/{uid} {
       // 🔥 ESSENCIAL PRA QUERY / ORDERBY / LEADERBOARD
-      allow list: if isAuthenticated();
+      allow read, get, list: if isAuthenticated();
 
-      match /{uid} {
-        // leitura individual
-        allow get: if isAuthenticated();
+      // criação segura
+      allow create: if isOwner(uid);
 
-        // criação segura
-        allow create: if isOwner(uid);
+      // update seguro (evita hack de role/admin)
+      allow update: if isOwner(uid) || isAdmin();
 
-        // update seguro (evita hack de role/admin)
-        allow update: if isOwner(uid) || isAdmin();
+      // 🔥 VALIDAÇÃO IMPORTANTE (ANTI-CHEAT BÁSICO)
+      allow update: if request.resource.data.role == resource.data.role || isAdmin();
 
-        // 🔥 VALIDAÇÃO IMPORTANTE (ANTI-CHEAT BÁSICO)
-        allow update: if request.resource.data.role == resource.data.role || isAdmin();
-
-        allow delete: if isAdmin();
-      }
+      allow delete: if isAdmin();
     }
 
     // ===============================================================
