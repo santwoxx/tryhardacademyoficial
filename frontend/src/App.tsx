@@ -1521,9 +1521,7 @@ export default function App() {
       
       if (newTime >= 1800) {
         setGameState('time-limit');
-        // If multiplayer, gracefully leave
-        if (room && socket) {
-          socket.emit('leaveRoom', room.id);
+        if (room) {
           setRoom(null);
         }
       }
@@ -1535,7 +1533,7 @@ export default function App() {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [gameState, user, room, socket]);
+  }, [gameState, user, room]);
 
   // Notification listener
   useEffect(() => {

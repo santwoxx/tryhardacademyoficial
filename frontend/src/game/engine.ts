@@ -11,12 +11,12 @@ import { audioManager } from './audio';
  * Minimal, high-performance sound management inside engine.ts
  */
 const GAME_SFX_CONFIG = {
-    shoot: 'https://cdn.pixabay.com/audio/2022/02/10/audio_fc068e214d.mp3',
-    collect: 'https://cdn.pixabay.com/audio/2021/08/04/audio_12b0c7443c.mp3',
-    hit: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c36940a045.mp3',
-    explosion: 'https://cdn.pixabay.com/audio/2022/03/10/audio_5e2f7f90f2.mp3',
-    level_up: 'https://cdn.pixabay.com/audio/2021/08/04/audio_c5df006b53.mp3',
-    powerup: 'https://cdn.pixabay.com/audio/2021/08/04/audio_12b0c7443c.mp3'
+    shoot: 'https://actions.google.com/sounds/v1/science_fiction/laser_pew.ogg',
+    collect: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
+    hit: 'https://actions.google.com/sounds/v1/weapons/bullet_impact_wood.ogg',
+    explosion: 'https://actions.google.com/sounds/v1/weapons/explosion_distant.ogg',
+    level_up: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
+    powerup: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg'
 };
 
 const SFX_POOLS: Record<string, HTMLAudioElement[]> = {};

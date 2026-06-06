@@ -41,15 +41,15 @@ class AudioManager {
     }
 
     private soundUrls: Record<SoundEffect, string> = {
-        shoot: 'https://cdn.pixabay.com/audio/2022/02/10/audio_fc068e214d.mp3', // Simple laser/blip
-        explosion: 'https://cdn.pixabay.com/audio/2022/03/10/audio_5e2f7f90f2.mp3',
-        hit: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c36940a045.mp3',
-        powerup: 'https://cdn.pixabay.com/audio/2021/08/04/audio_12b0c7443c.mp3',
-        level_up: 'https://cdn.pixabay.com/audio/2021/08/04/audio_c5df006b53.mp3',
-        victory: 'https://cdn.pixabay.com/audio/2021/11/25/audio_91b1626f30.mp3',
-        death: 'https://cdn.pixabay.com/audio/2021/08/04/audio_3cd0301e7e.mp3',
-        correct: 'https://cdn.pixabay.com/audio/2022/03/10/audio_783cd3a602.mp3',
-        wrong: 'https://cdn.pixabay.com/audio/2021/08/04/audio_3cd0301e7e.mp3'
+        shoot: 'https://actions.google.com/sounds/v1/science_fiction/laser_pew.ogg',
+        explosion: 'https://actions.google.com/sounds/v1/weapons/explosion_distant.ogg',
+        hit: 'https://actions.google.com/sounds/v1/weapons/bullet_impact_wood.ogg',
+        powerup: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
+        level_up: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
+        victory: 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg',
+        death: 'https://actions.google.com/sounds/v1/cartoon/cartoon_cowbell.ogg',
+        correct: 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg',
+        wrong: 'https://actions.google.com/sounds/v1/cartoon/cartoon_cowbell.ogg'
     };
 
     init() {
