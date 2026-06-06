@@ -2452,20 +2452,29 @@ export class Game {
         this.pool.spawn(x, y, color, adjustedCount, speed, glow);
     }
 
+    private fpsAccumulator: number = 0;
+    private fpsFrameCount: number = 0;
+
     private updateQualityScaling(dt: number) {
+        if (dt === 0) return;
         const currentFps = 1000 / dt;
-        this.fpsHistory.push(currentFps);
-        if (this.fpsHistory.length > 60) this.fpsHistory.shift();
         
-        const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
+        this.fpsAccumulator += currentFps;
+        this.fpsFrameCount++;
         
-        // Auto-scale quality if FPS drops significantly
-        if (avgFps < 30 && this.quality === 'high') {
-            this.quality = 'medium';
-            this.fpsHistory = [];
-        } else if (avgFps < 20 && this.quality === 'medium') {
-            this.quality = 'low';
-            this.fpsHistory = [];
+        // Avalia a cada 60 frames (aprox 1 segundo)
+        if (this.fpsFrameCount >= 60) {
+            const avgFps = this.fpsAccumulator / this.fpsFrameCount;
+            
+            // Auto-scale quality if FPS drops significantly
+            if (avgFps < 30 && this.quality === 'high') {
+                this.quality = 'medium';
+            } else if (avgFps < 20 && this.quality === 'medium') {
+                this.quality = 'low';
+            }
+            
+            this.fpsAccumulator = 0;
+            this.fpsFrameCount = 0;
         }
     }
 
@@ -2697,8 +2706,15 @@ export class Game {
 
         if (this.gameState === 'loading') {
             this.loadingTimer -= dt;
-            this.loadingProgress = Math.min(100, (1 - this.loadingTimer / 1500) * 100);
-            if (this.onLoadingUpdate) this.onLoadingUpdate(this.loadingProgress);
+            const newProgress = Math.floor(Math.min(100, (1 - this.loadingTimer / 1500) * 100));
+            // OTIMIZAÇÃO: Só avisa o React se o número inteiro mudar, não a cada frame decimal!
+            if (newProgress !== Math.floor(this.loadingProgress)) {
+                this.loadingProgress = newProgress;
+                if (this.onLoadingUpdate) this.onLoadingUpdate(this.loadingProgress);
+            } else {
+                this.loadingProgress = newProgress;
+            }
+            
             if (this.loadingTimer <= 0) {
                 this.gameState = 'playing';
                 if (this.onGameStateChange) this.onGameStateChange(this.gameState);

@@ -9,8 +9,18 @@ export class GlowManager {
     private static cache: Map<string, HTMLCanvasElement> = new Map();
 
     static getGlow(color: string, radius: number): HTMLCanvasElement {
+        // PERF: Arredondar o raio evita Memory Leak. 
+        // Com raios float aleatórios, milhares de canvases eram cacheados por segundo.
+        radius = Math.max(1, Math.round(radius)); 
+        
         const key = `${color}_${radius}`;
         if (this.cache.has(key)) return this.cache.get(key)!;
+
+        // Proteção adicional para não estourar a memória caso o jogo rode muito tempo
+        if (this.cache.size > 200) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey!);
+        }
 
         const canvas = document.createElement('canvas');
         const size = Math.ceil(radius * 2);
