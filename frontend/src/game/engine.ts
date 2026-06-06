@@ -1959,6 +1959,7 @@ export class Game {
     loadingTimer: number = 0;
     loadingProgress: number = 0;
     starSpawnTimer: number = 0;
+    multiplayerLevelTimer: number = 0;
     kills: number = 0; // Kills in current level
     totalKills: number = 0; // Cumulative kills
     level: number = 1;
@@ -2629,6 +2630,16 @@ export class Game {
                 if (this.onSyncNetwork) this.onSyncNetwork();
                 this.networkSyncTimer = 0;
             }
+
+            // Multiplayer Level Progression (every 60 seconds)
+            if (this.gameState === 'playing') {
+                this.multiplayerLevelTimer += dt;
+                if (this.multiplayerLevelTimer >= 60000) {
+                    this.level++;
+                    this.multiplayerLevelTimer = 0;
+                    if (this.onLevelUp) this.onLevelUp(this.level);
+                }
+            }
         }
 
         // Level Progression (Offline only)
@@ -3181,7 +3192,7 @@ export class Game {
     }
 
     private prepareNextLevel() {
-        if (this.level >= 50) {
+        if (this.level >= 100) {
             this.gameOver = true;
             this.paused = true;
             if (this.onVictory) this.onVictory();
@@ -3190,7 +3201,7 @@ export class Game {
 
         this.level++;
         this.kills = 0;
-        this.killsToNextLevel = Math.min(50, this.level * 5 + 5);
+        this.killsToNextLevel = Math.min(100, this.level * 5 + 5);
         this.player.level = this.level;
         this.player.skinId = this.level;
         this.stars = [];
@@ -3218,7 +3229,7 @@ export class Game {
         }
 
         // Spawn Boss if level is multiple of 5
-        if (this.level === 50) {
+        if (this.level === 100) {
             this.spawnSuperBoss();
         } else if (this.level % 5 === 0) {
             this.spawnBoss();
@@ -3260,11 +3271,11 @@ export class Game {
     private spawnSuperBoss() {
         const x = this.canvas.width / 2;
         const y = -300;
-        const boss = new Bot(x, y, 50);
+        const boss = new Bot(x, y, 100);
         boss.type = 'super_boss';
         boss.radius = 120;
-        boss.health = 500;
-        boss.maxHealth = 500;
+        boss.health = 1000;
+        boss.maxHealth = 1000;
         boss.color = '#ff00ff'; // Magenta / Neon Pink
         boss.glowColor = '#ff00ff';
         this.bots.push(boss);

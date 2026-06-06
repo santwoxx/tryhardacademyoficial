@@ -247,3 +247,42 @@ canvas {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(188, 19, 254, 0.5);
 }
+
+/* Custom Scanline for Loading Screen */
+.bg-scanline {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 242, 255, 0.08) 50%
+  );
+  background-size: 100% 4px;
+}
+
+@keyframes scanline-loading {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100%; }
+}
+
+.animate-scanline {
+  animation: scanline-loading 12s linear infinite;
+}
+
+/* Radar Sweep effect for Lobby empty slots */
+@keyframes radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-radar {
+  animation: radar-sweep 4s linear infinite;
+}
+
+/* Pulse animation for searching */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.05); }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+

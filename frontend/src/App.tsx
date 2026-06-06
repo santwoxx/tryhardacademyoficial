@@ -23,7 +23,7 @@ import {
   deleteField
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { MathEngine, Question } from './game/mathEngine';
+import { QuestionEngine, Question } from './game/questionEngine';
 import { LoadingScreen } from './components/LoadingScreen';
 
 // Lazy loaded components for better performance
@@ -36,9 +36,6 @@ import {
   GoogleAuthProvider, 
   signInWithPopup, 
   onAuthStateChanged, 
-  signInAnonymously,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
   signOut,
   updateProfile
 } from 'firebase/auth';
@@ -1362,42 +1359,31 @@ export default function App() {
 
           currentOpPath = `players/${u.uid}`;
           if (!playerSnap.exists()) {
-            // If no selection and no invitation, wait for selection
-            if (!userTypeSelection && role === 'player' && u.email !== "natanmarinhocanalyt@gmail.com") {
-              setGameState('auth');
-              return;
-            }
-
-            // New user initialization
-            const initialRole = userTypeSelection === 'teacher' ? 'pending-teacher' : role;
-            const initialNick = authNickname || (u.displayName ? u.displayName.split(' ')[0].substring(0, 15) : u.email?.split('@')[0].substring(0, 15) || 'Player');
+            // Automatically set nickname to Google displayName
             const newPlayerData = {
               uid: u.uid,
-              nickname: initialNick,
+              nickname: (u.displayName || "Jogador").slice(0, 15),
               trophies: 0,
               level: 1,
-              role: initialRole,
+              role: role,
               teacherId,
               schoolName,
               lastUpdate: fsServerTimestamp()
             };
             await setDoc(playerRef, newPlayerData);
             
-            // Shadow write to RTDB for compatibility with RTDB rules
             if (isOnline) {
-              const userRef = ref(db, `players/${u.uid}`);
-              set(userRef, newPlayerData).catch(e => console.warn("RTDB shadow write failed:", e));
+               const userRtRef = ref(db, `players/${u.uid}`);
+               set(userRtRef, newPlayerData).catch(e => console.warn("RTDB shadow write failed:", e));
             }
-
-            setPlayerData(newPlayerData);
-            setNickname(initialNick);
-            setTrophies(0);
             
-            if (initialRole === 'pending-teacher') {
-              setGameState('auth');
-            } else {
-              setGameState('menu');
-            }
+            setPlayerData(newPlayerData);
+            setNickname(newPlayerData.nickname);
+            setTrophies(0);
+            setCurrentLevel(1);
+            setGameState(role === 'pending-teacher' ? 'auth' : 'menu');
+            setIsAuthChecked(true);
+            return;
           } else {
             const data = playerSnap.data() as any;
             
@@ -1826,60 +1812,6 @@ export default function App() {
     });
   };
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    setLoading(true);
-    try {
-      if (authMode === 'register' || authMode === 'set-nickname') {
-        if (!authNickname || authNickname.length < 3) {
-          throw new Error('Nickname deve ter pelo menos 3 caracteres');
-        }
-        
-        let u = auth.currentUser;
-        if (authMode === 'register') {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          u = userCredential.user;
-        }
-
-      if (u && isOnline) {
-        const playerDocRef = doc(firestore, 'players', u.uid);
-        if (authMode === 'register' || authMode === 'set-nickname') {
-          await updateDoc(playerDocRef, {
-            nickname: authNickname,
-            lastUpdate: fsServerTimestamp()
-          });
-          setNickname(authNickname);
-        }
-          // We don't setGameState('menu') here anymore, 
-          // we let onAuthStateChanged handle it based on the profile data
-        }
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-    } catch (error: any) {
-      console.error("Auth error:", error);
-      let message = error.message;
-      if (error.code === 'auth/invalid-credential') {
-        message = 'E-mail ou senha incorretos.';
-      } else if (error.code === 'auth/email-already-in-use') {
-        message = 'Este e-mail já está em uso.';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'A senha deve ter pelo menos 6 caracteres.';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'E-mail inválido.';
-      } else if (error.code === 'auth/user-not-found') {
-        message = 'Usuário não encontrado.';
-      } else if (error.code === 'auth/wrong-password') {
-        message = 'Senha incorreta.';
-      } else if (error.code === 'auth/operation-not-allowed') {
-        message = `O login por e-mail/senha não está habilitado no Firebase Console para o projeto "${firebaseConfig.projectId}". Verifique se este é o ID do projeto onde você ativou o recurso.`;
-      }
-      setAuthError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -2265,7 +2197,7 @@ export default function App() {
     };
 
     game.onStarCollected = (index) => {
-      let q = MathEngine.getInstance().generateQuestion(undefined, currentLevelRef.current);
+      let q = QuestionEngine.getInstance().generateQuestion(undefined, gameRef.current?.level || 1);
       
       // Safety fallback: ensure a question is ALWAYS generated
       if (!q) {
@@ -2601,16 +2533,17 @@ export default function App() {
     }
 
     game.onLevelUp = (level) => {
-      setCurrentLevel(level);
-      setStats(prev => ({ ...prev, level }));
-      
-      // Persist level to Firebase
-      if (currentUser) {
-        const playerRef = doc(firestore, 'players', currentUser.uid);
-        updateDoc(playerRef, { 
-          level: level,
-          lastUpdate: fsServerTimestamp()
-        }).catch(error => handleDatabaseError(error, OperationType.UPDATE, `players/${currentUser.uid}`));
+      if (level > currentLevelRef.current) {
+        setCurrentLevel(level);
+        
+        // Persist level to Firebase
+        if (currentUser) {
+          const playerRef = doc(firestore, 'players', currentUser.uid);
+          updateDoc(playerRef, { 
+            level: level,
+            lastUpdate: fsServerTimestamp()
+          }).catch(error => handleDatabaseError(error, OperationType.UPDATE, `players/${currentUser.uid}`));
+        }
       }
     };
 
@@ -3228,7 +3161,7 @@ export default function App() {
       });
       
       if (currentQuestion) {
-        MathEngine.getInstance().recordPerformance(true, currentQuestion.difficulty);
+        QuestionEngine.getInstance().recordPerformance(true, currentQuestion.difficulty);
       }
     } else {
       setFeedback(isTimeout ? 'timeout' : 'wrong');
@@ -3237,7 +3170,7 @@ export default function App() {
       gameRef.current.player.lives -= 1;
       
       if (currentQuestion) {
-        MathEngine.getInstance().recordPerformance(false, currentQuestion.difficulty);
+        QuestionEngine.getInstance().recordPerformance(false, currentQuestion.difficulty);
       }
     }
 
@@ -3538,38 +3471,11 @@ export default function App() {
                   TRYHARD <span className="text-[#bc13fe]">ACADEMY</span>
                 </h1>
                 <p className="text-white/40 text-xs uppercase tracking-widest font-bold">
-                  {authMode === 'login' ? 'Bem-vindo de volta' : (authMode === 'register' ? 'Crie sua conta' : 'Escolha seu Nickname')}
+                  Bem-vindo ao Combate
                 </p>
               </div>
 
-              {(!userTypeSelection && !playerData) ? (
-                <div className="flex flex-col gap-4">
-                  <h2 className="text-white text-center font-bold mb-4 uppercase tracking-widest text-sm">Pronto para começar?</h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserTypeSelection('player');
-                    }}
-                    className="group relative w-full py-6 bg-[#bc13fe] border-2 border-[#bc13fe]/20 rounded-2xl flex flex-col items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(188,19,254,0.2)] cursor-pointer"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
-                    <Zap className="w-8 h-8 text-white relative z-10 pointer-events-none" />
-                    <span className="font-black uppercase tracking-widest text-xl text-white relative z-10 pointer-events-none italic">Jogar agora</span>
-                    <span className="text-[10px] text-white/60 uppercase font-bold relative z-10 pointer-events-none">Entre no universo Tryhard Academy</span>
-                  </button>
-
-                  <button 
-                    onClick={() => {
-                      setUserTypeSelection('player');
-                      setAuthMode('login');
-                    }}
-                    className="mt-4 text-white/10 hover:text-white/30 text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-2"
-                  >
-                    <ShieldCheck className="w-3 h-3" />
-                    Portal do Atleta
-                  </button>
-                </div>
-              ) : playerData?.role === 'pending-teacher' ? (
+              {playerData?.role === 'pending-teacher' ? (
                 <div className="text-center py-8">
                   <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-orange-500/30">
                     <Timer className="w-10 h-10 text-orange-500 animate-pulse" />
@@ -3581,113 +3487,35 @@ export default function App() {
                   </p>
                   <button 
                     onClick={() => auth.signOut()}
-                    className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                    className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
                   >
                     Sair da Conta
                   </button>
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center gap-4 mb-8">
-                    {(!user || authMode !== 'set-nickname') && (
-                      <button 
-                        onClick={() => user ? auth.signOut() : setUserTypeSelection(null)}
-                        className="p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-colors"
-                      >
-                        <ArrowLeft className="w-5 h-5" />
-                      </button>
-                    )}
-                    <div className="flex-1">
-                      <h2 className="text-xl font-black text-white uppercase tracking-tighter italic">
-                        Área de Acesso
-                      </h2>
-                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">
-                        {authMode === 'login' ? 'Faça seu login' : authMode === 'register' ? 'Crie sua conta' : 'Escolha seu apelido'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleEmailAuth} className="space-y-4">
-                    {(authMode === 'register' || authMode === 'set-nickname') && (
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-2 font-bold">Nickname (Permanente)</label>
-                        <input 
-                          type="text" 
-                          value={authNickname}
-                          onChange={(e) => setAuthNickname(e.target.value.slice(0, 15))}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold focus:outline-none focus:border-[#bc13fe] transition-all"
-                          placeholder="Seu nick no jogo..."
-                          required
-                        />
-                      </div>
-                    )}
-                    {authMode !== 'set-nickname' && (
-                      <>
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-2 font-bold">E-mail</label>
-                          <input 
-                            type="email" 
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold focus:outline-none focus:border-[#bc13fe] transition-all"
-                            placeholder="seu@email.com"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-2 font-bold">Senha</label>
-                          <input 
-                            type="password" 
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold focus:outline-none focus:border-[#bc13fe] transition-all"
-                            placeholder="••••••••"
-                            required
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {authError && (
-                      <div className="flex items-center gap-2 text-red-500 text-xs font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{authError}</span>
-                      </div>
-                    )}
-
-                    <button 
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-4 bg-[#bc13fe] text-white rounded-xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(188,19,254,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                    >
-                      {loading ? 'Processando...' : (authMode === 'login' ? 'Entrar' : (authMode === 'register' ? 'Registrar' : 'Confirmar Nickname'))}
-                    </button>
-                  </form>
-
-                  {authMode !== 'set-nickname' && (
-                    <div className="mt-6 flex flex-col gap-4">
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                        <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold"><span className="bg-[#0a0a0a] px-4 text-white/20">Ou</span></div>
-                      </div>
-
-                      <button 
-                        onClick={handleGoogleLogin}
-                        className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white/10 transition-all"
-                      >
-                        <Users className="w-5 h-5 text-[#4285F4]" />
-                        Google Login
-                      </button>
-
-                      <button 
-                        onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-                        className="text-white/40 text-xs font-bold uppercase tracking-widest hover:text-white transition-all text-center"
-                      >
-                        {authMode === 'login' ? 'Não tem uma conta? Registre-se' : 'Já tem uma conta? Faça Login'}
-                      </button>
+                <div className="flex flex-col gap-6 items-center">
+                  <h2 className="text-white text-center font-bold uppercase tracking-widest text-sm mb-2">Pronto para a Arena?</h2>
+                  
+                  {authError && (
+                    <div className="w-full flex items-center gap-2 text-red-500 text-xs font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{authError}</span>
                     </div>
                   )}
-                </>
+
+                  <button 
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    className="group relative w-full py-5 bg-gradient-to-r from-[#bc13fe] to-[#8007cf] hover:from-[#d024ff] hover:to-[#9612eb] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-[0_0_35px_rgba(188,19,254,0.4)] disabled:opacity-50"
+                  >
+                    <Users className="w-5 h-5 text-white animate-pulse" />
+                    Entrar com o Google
+                  </button>
+                  
+                  <p className="text-[10px] text-white/30 uppercase tracking-widest text-center">
+                    Acesso exclusivo via login Google
+                  </p>
+                </div>
               )}
             </motion.div>
           </motion.div>
@@ -4144,8 +3972,31 @@ export default function App() {
                       })}
                       {/* Empty Slots */}
                       {Array.from({ length: 4 - room.playerIds.length }).map((_, i) => (
-                        <div key={`empty-${i}`} className="p-4 rounded-2xl border border-white/5 bg-white/[0.02] flex items-center justify-center border-dashed">
-                          <span className="text-white/10 text-[10px] font-black uppercase tracking-[0.3em]">Aguardando...</span>
+                        <div 
+                          key={`empty-${i}`} 
+                          className="relative h-[92px] p-4 rounded-2xl border border-white/5 bg-zinc-950/40 flex flex-col items-center justify-center overflow-hidden"
+                        >
+                          {/* Radial Scanning line */}
+                          <div className="absolute w-[140px] h-[140px] border border-cyan-400/5 rounded-full animate-glow-pulse flex items-center justify-center pointer-events-none">
+                            <div className="w-[80px] h-[80px] border border-[#bc13fe]/5 rounded-full" />
+                          </div>
+                          
+                          {/* Rotating radar sweep line */}
+                          <div 
+                            className="absolute top-1/2 left-1/2 w-[200%] h-[200%] bg-gradient-to-tr from-[#00f2ff]/5 via-transparent to-transparent animate-radar pointer-events-none" 
+                            style={{ transformOrigin: 'top left', marginTop: '-100%', marginLeft: '-100%' }}
+                          />
+                          
+                          <div className="relative z-10 flex flex-col items-center gap-1">
+                            <motion.div 
+                              animate={{ opacity: [0.3, 0.7, 0.3] }}
+                              transition={{ repeat: Infinity, duration: 2 }}
+                              className="text-[9px] font-black uppercase tracking-[0.25em] text-cyan-400/70"
+                            >
+                              PROCURANDO ATLETA...
+                            </motion.div>
+                            <span className="text-[7px] text-white/25 uppercase font-mono tracking-widest">SLOT DISPONÍVEL</span>
+                          </div>
                         </div>
                       ))}
                     </div>

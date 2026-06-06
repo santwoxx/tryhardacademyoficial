@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface LoadingScreenProps {
@@ -8,6 +8,24 @@ interface LoadingScreenProps {
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, level }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loadingPhrase, setLoadingPhrase] = useState('Inicializando sistemas nucleares...');
+
+  // Dynamic status phrases based on load progress
+  useEffect(() => {
+    if (progress < 20) {
+      setLoadingPhrase('Sintonizando frequências neurais...');
+    } else if (progress < 40) {
+      setLoadingPhrase('Carregando algoritmos algébricos de combate...');
+    } else if (progress < 60) {
+      setLoadingPhrase('Estabelecendo conexão segura com banco de dados...');
+    } else if (progress < 80) {
+      setLoadingPhrase('Construindo malhas tridimensionais da arena...');
+    } else if (progress < 95) {
+      setLoadingPhrase('Injetando potência nos motores principais...');
+    } else {
+      setLoadingPhrase('Preparado. Entrando na arena Tryhard...');
+    }
+  }, [progress]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,21 +47,35 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, level })
       speedY: number;
       color: string;
       opacity: number;
+      pulseSpeed: number;
+      pulseDir: number;
 
       constructor() {
         this.x = Math.random() * canvas!.width;
         this.y = Math.random() * canvas!.height;
-        this.size = Math.random() * (isMobile ? 1.5 : 2) + 1;
-        this.speedX = (Math.random() - 0.5) * (isMobile ? 1 : 2);
-        this.speedY = (Math.random() - 0.5) * (isMobile ? 1 : 2);
-        const colors = ['#00f2ff', '#bc13fe', '#ff00ff'];
+        this.size = Math.random() * (isMobile ? 1.2 : 2) + 0.8;
+        this.speedX = (Math.random() - 0.5) * (isMobile ? 0.6 : 1.2);
+        this.speedY = (Math.random() - 0.5) * (isMobile ? 0.6 : 1.2);
+        const colors = ['#00f2ff', '#bc13fe', '#ff00ff', '#3b82f6'];
         this.color = colors[Math.floor(Math.random() * colors.length)];
-        this.opacity = Math.random() * 0.5 + 0.2;
+        this.opacity = Math.random() * 0.4 + 0.15;
+        this.pulseSpeed = Math.random() * 0.02 + 0.005;
+        this.pulseDir = Math.random() > 0.5 ? 1 : -1;
       }
 
       update() {
         this.x += this.speedX;
         this.y += this.speedY;
+
+        // Pulse opacity for cyber star effect
+        this.opacity += this.pulseSpeed * this.pulseDir;
+        if (this.opacity > 0.75) {
+          this.opacity = 0.75;
+          this.pulseDir = -1;
+        } else if (this.opacity < 0.15) {
+          this.opacity = 0.15;
+          this.pulseDir = 1;
+        }
 
         if (this.x > canvas!.width) this.x = 0;
         else if (this.x < 0) this.x = canvas!.width;
@@ -53,37 +85,65 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, level })
 
       draw() {
         if (!ctx) return;
+        ctx.save();
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
         ctx.globalAlpha = this.opacity;
         ctx.fill();
         
-        // Glow effect - skip on mobile
+        // Glow effect
         if (!isMobile) {
-          ctx.shadowBlur = 10;
+          ctx.shadowBlur = 8;
           ctx.shadowColor = this.color;
         }
-        ctx.globalAlpha = 1;
+        ctx.restore();
       }
     }
 
     const init = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      const count = isMobile ? 25 : 50;
+      const count = isMobile ? 30 : 70;
       for (let i = 0; i < count; i++) {
         particles.push(new Particle());
       }
     };
 
     const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Dark trail effect
+      ctx.fillStyle = 'rgba(5, 5, 5, 0.08)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw gridlines in background
+      drawGrid();
+
       particles.forEach(p => {
         p.update();
         p.draw();
       });
       animationFrameId = requestAnimationFrame(animate);
+    };
+
+    const drawGrid = () => {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 242, 255, 0.015)';
+      ctx.lineWidth = 1;
+      const gridSize = 60;
+      
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+      ctx.restore();
     };
 
     init();
@@ -107,109 +167,140 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, level })
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 flex flex-col items-center justify-center bg-[#050505] z-[100] pointer-events-auto overflow-hidden"
+      className="fixed inset-0 flex flex-col items-center justify-center bg-[#050505] z-[100] pointer-events-auto overflow-hidden select-none"
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 pointer-events-none opacity-40"
+        className="absolute inset-0 pointer-events-none"
       />
       
-      <div className="relative z-10 flex flex-col items-center">
+      {/* Moving scanline */}
+      <div className="absolute inset-0 pointer-events-none z-10 bg-scanline opacity-10 animate-scanline" />
+
+      {/* Cyber/Steam HUD Frame decoration */}
+      <div className="absolute inset-8 border border-white/5 pointer-events-none z-20 rounded-[2rem]">
+        <div className="absolute top-0 left-[20%] right-[20%] h-px bg-gradient-to-r from-transparent via-[#00f2ff]/30 to-transparent" />
+        <div className="absolute bottom-0 left-[20%] right-[20%] h-px bg-gradient-to-r from-transparent via-[#bc13fe]/30 to-transparent" />
+        <div className="absolute top-4 left-4 text-[8px] font-mono text-white/25 uppercase tracking-widest">TRYHARD SYSTEM v4.2</div>
+        <div className="absolute top-4 right-4 text-[8px] font-mono text-white/25 uppercase tracking-widest">SECURE COMBAT HANDLER</div>
+        <div className="absolute bottom-4 left-4 text-[8px] font-mono text-cyan-400/30 uppercase tracking-widest">LNK: READY</div>
+        <div className="absolute bottom-4 right-4 text-[8px] font-mono text-[#bc13fe]/30 uppercase tracking-widest">SYS: ONLINE</div>
+      </div>
+      
+      <div className="relative z-30 flex flex-col items-center">
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="mb-12 relative"
+          transition={{ type: 'spring', stiffness: 80, damping: 15 }}
+          className="mb-8 relative"
         >
-          {/* Circular Progress */}
-          <svg className="w-48 h-48 transform -rotate-90">
+          {/* Circular Progress & Glowing Ring */}
+          <div className="absolute inset-0 rounded-full border border-white/5 blur-sm" />
+          <svg className="w-56 h-56 transform -rotate-90">
+            <defs>
+              <linearGradient id="cyber-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00f2ff" />
+                <stop offset="50%" stopColor="#bc13fe" />
+                <stop offset="100%" stopColor="#00f2ff" />
+              </linearGradient>
+            </defs>
             <circle
-              cx="96"
-              cy="96"
-              r="88"
-              stroke="currentColor"
-              strokeWidth="4"
+              cx="112"
+              cy="112"
+              r="96"
+              stroke="rgba(255, 255, 255, 0.02)"
+              strokeWidth="5"
               fill="transparent"
-              className="text-white/5"
             />
             <motion.circle
-              cx="96"
-              cy="96"
-              r="88"
-              stroke="currentColor"
-              strokeWidth="4"
+              cx="112"
+              cy="112"
+              r="96"
+              stroke="url(#cyber-gradient)"
+              strokeWidth="5"
               fill="transparent"
-              strokeDasharray={2 * Math.PI * 88}
-              initial={{ strokeDashoffset: 2 * Math.PI * 88 }}
-              animate={{ strokeDashoffset: (2 * Math.PI * 88) * (1 - progress / 100) }}
-              transition={{ type: "spring", stiffness: 50, damping: 20 }}
-              className="text-cyan-400 drop-shadow-[0_0_10px_rgba(0,242,255,0.5)]"
+              strokeDasharray={2 * Math.PI * 96}
+              initial={{ strokeDashoffset: 2 * Math.PI * 96 }}
+              animate={{ strokeDashoffset: (2 * Math.PI * 96) * (1 - progress / 100) }}
+              transition={{ type: "spring", stiffness: 45, damping: 15 }}
+              className="drop-shadow-[0_0_12px_rgba(0,242,255,0.4)]"
               strokeLinecap="round"
             />
           </svg>
           
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span 
-              className="text-5xl font-black text-white font-mono"
+            <motion.div 
+              className="flex items-baseline"
               key={Math.round(progress)}
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
             >
-              {Math.round(progress)}%
-            </motion.span>
-            <span className="text-[10px] text-cyan-400/60 font-bold tracking-[0.3em] uppercase mt-1">
-              Sincronizando
+              <span className="text-6xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+                {Math.round(progress)}
+              </span>
+              <span className="text-lg font-black text-[#00f2ff] ml-0.5">%</span>
+            </motion.div>
+            <span className="text-[9px] text-[#00f2ff] font-black tracking-[0.4em] uppercase mt-2 animate-pulse">
+              Carregando
             </span>
           </div>
         </motion.div>
 
-        <div className="w-96 space-y-8">
-          <div className="text-center">
+        <div className="w-[28rem] space-y-6">
+          <div className="text-center px-4">
             <motion.h3 
-              initial={{ y: 20, opacity: 0 }}
+              initial={{ y: 15, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-2xl font-bold text-white mb-2 tracking-tight"
+              transition={{ delay: 0.1 }}
+              className="text-xl font-black text-white mb-2 tracking-tight italic"
             >
               PREPARANDO NÍVEL {level}
             </motion.h3>
-            <motion.p 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-white/40 text-xs font-medium tracking-widest uppercase"
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="h-8 flex items-center justify-center"
             >
-              Carregando ativos neurais e malhas de combate
-            </motion.p>
+              <p className="text-white/40 text-[10px] font-bold tracking-widest uppercase truncate max-w-full">
+                {loadingPhrase}
+              </p>
+            </motion.div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Subsystems Monitor grid */}
+          <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Motores', val: progress > 30 ? 'ONLINE' : 'BOOTING' },
-              { label: 'Escudos', val: progress > 60 ? 'ONLINE' : 'BOOTING' },
-              { label: 'Armas', val: progress > 85 ? 'ONLINE' : 'BOOTING' },
-              { label: 'Núcleo', val: progress > 10 ? 'ESTÁVEL' : 'INICIALIZANDO' }
+              { label: 'Matriz de Cálculo', val: progress > 30 ? 'PRONTO' : 'CARREGANDO', color: progress > 30 ? 'text-[#00f2ff]' : 'text-white/30' },
+              { label: 'Defesas Defletoras', val: progress > 60 ? 'PRONTO' : 'SINTONIZANDO', color: progress > 60 ? 'text-[#00f2ff]' : 'text-white/30' },
+              { label: 'Armamento Laser', val: progress > 85 ? 'PRONTO' : 'CARREGANDO', color: progress > 85 ? 'text-[#00f2ff]' : 'text-white/30' },
+              { label: 'Núcleo Central', val: progress > 15 ? 'ESTÁVEL' : 'INICIALIZANDO', color: progress > 15 ? 'text-[#00f2ff]' : 'text-white/30' }
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + i * 0.1 }}
-                className="bg-white/5 border border-white/10 rounded-lg p-3 flex flex-col gap-1"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 + i * 0.08 }}
+                className="bg-zinc-950/60 border border-white/5 rounded-xl p-3 flex flex-col gap-1.5 relative overflow-hidden group hover:border-white/10 transition-all"
               >
-                <span className="text-[8px] text-white/30 font-bold uppercase tracking-tighter">{stat.label}</span>
-                <span className={`text-[10px] font-black tracking-widest ${stat.val === 'ONLINE' || stat.val === 'ESTÁVEL' ? 'text-cyan-400' : 'text-white/60'}`}>
+                <div className="absolute top-0 left-0 w-[2px] h-full bg-[#00f2ff]/20 group-hover:bg-[#00f2ff]/50 transition-colors" />
+                <span className="text-[7.5px] text-white/30 font-black uppercase tracking-widest pl-1">{stat.label}</span>
+                <span className={`text-[10px] font-black tracking-widest pl-1 ${stat.color}`}>
                   {stat.val}
                 </span>
               </motion.div>
             ))}
           </div>
           
-          <div className="flex justify-center">
-             <motion.div
-               animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
-               transition={{ repeat: Infinity, duration: 1.5 }}
-               className="w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_15px_rgba(0,242,255,1)]"
-             />
+          {/* Micro-loading dot indicator */}
+          <div className="flex justify-center items-center gap-1.5 pt-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                animate={{ scale: [1, 1.4, 1], opacity: [0.2, 0.7, 0.2] }}
+                transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
+                className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full shadow-[0_0_8px_rgba(0,242,255,0.7)]"
+              />
+            ))}
           </div>
         </div>
       </div>
