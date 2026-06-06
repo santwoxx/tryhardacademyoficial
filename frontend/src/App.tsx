@@ -4257,14 +4257,14 @@ export default function App() {
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl w-full max-w-sm shadow-2xl"
+              className="bg-[#0a0a0a] border border-white/10 p-5 rounded-3xl w-full max-w-xs shadow-2xl"
             >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-black uppercase tracking-widest text-white">Ajustes</h2>
-                <button onClick={() => setShowSettings(false)}><X className="w-5 h-5 text-white/50" /></button>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-black uppercase tracking-widest text-white">Ajustes</h2>
+                <button onClick={() => setShowSettings(false)}><X className="w-5 h-5 text-white/50 hover:text-white transition" /></button>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-2 font-bold">Seu Nickname (Permanente)</label>
                   <div className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold tracking-widest opacity-70">
@@ -4634,14 +4634,6 @@ export default function App() {
               </div>
 
               <div className="flex flex-col gap-4">
-                <button
-                  onClick={handleRevive}
-                  className="w-full py-5 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_25px_rgba(234,179,8,0.3)] flex items-center justify-center gap-3"
-                >
-                  <Play className="w-5 h-5 fill-black" />
-                  REVIVER COM ANÚNCIO
-                </button>
-
                 <button
                   onClick={handleRestart}
                   className="game-btn-danger py-6 text-xl shadow-[0_0_40px_rgba(239,68,68,0.4)]"
