@@ -1034,6 +1034,9 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [paymentReturnToast, setPaymentReturnToast] = useState<{ type: 'success' | 'failed' | null }>({ type: null });
+  const [playtimeWarning, setPlaytimeWarning] = useState<null | '5min' | '1min'>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(1800);
   const [showStore, setShowStore] = useState(false);
   const [showMissionsMenu, setShowMissionsMenu] = useState(false);
   const [showRotatePrompt, setShowRotatePrompt] = useState(false);
@@ -1316,6 +1319,44 @@ export default function App() {
     };
   }, []);
 
+  // Detect Cakto payment return and refresh VIP status
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+    if (paymentStatus === 'success' || paymentStatus === 'approved') {
+      setPaymentReturnToast({ type: 'success' });
+      // Clean URL so refresh doesn't re-show
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'refused') {
+      setPaymentReturnToast({ type: 'failed' });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // When user returns to the tab, refresh isVIP (webhook may have fired meanwhile)
+  useEffect(() => {
+    const onFocus = async () => {
+      if (user && isOnline) {
+        try {
+          const snap = await getDoc(doc(firestore, 'players', user.uid));
+          if (snap.exists()) {
+            setPlayerData(snap.data() as any);
+          }
+        } catch (e) { /* silent */ }
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [user, isOnline]);
+
+  // Auto-dismiss payment return toast
+  useEffect(() => {
+    if (paymentReturnToast.type) {
+      const t = setTimeout(() => setPaymentReturnToast({ type: null }), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [paymentReturnToast]);
+
   // Sync quality to game instance, localStorage and Firebase
   useEffect(() => {
     localStorage.setItem('quality', quality);
@@ -1525,8 +1566,27 @@ export default function App() {
         date: playerData.lastPlayedDate || new Date().toISOString().split('T')[0],
         isVIP: playerData.isVIP || false
       };
+      // Reset warnings when VIP toggles on
+      if (playerData.isVIP) {
+        setPlaytimeWarning(null);
+        setRemainingSeconds(1800);
+      }
     }
   }, [playerData]);
+
+  const DAILY_LIMIT_SECONDS = 1800; // 30 minutes
+
+  // Reactive remaining seconds for HUD/menu (updates every second while playing)
+  useEffect(() => {
+    if (playerData?.isVIP) {
+      setRemainingSeconds(1800);
+      return;
+    }
+    const { time, date } = playtimeRef.current;
+    const today = new Date().toISOString().split('T')[0];
+    const used = date === today ? time : 0;
+    setRemainingSeconds(Math.max(0, DAILY_LIMIT_SECONDS - used));
+  }, [playerData, gameState]);
 
   // Track playtime while playing
   useEffect(() => {
@@ -1546,15 +1606,28 @@ export default function App() {
       }
       
       playtimeRef.current = { time: newTime, date: newDate, isVIP };
+      setRemainingSeconds(Math.max(0, DAILY_LIMIT_SECONDS - newTime));
       
-      if (newTime >= 1800) {
+      // Warnings (fire once each)
+      if (newTime === DAILY_LIMIT_SECONDS - 300) {
+        setPlaytimeWarning('5min');
+        triggerHaptic();
+        audioManager.playSound('wrong');
+      } else if (newTime === DAILY_LIMIT_SECONDS - 60) {
+        setPlaytimeWarning('1min');
+        triggerHaptic();
+        audioManager.playSound('wrong');
+      }
+      
+      if (newTime >= DAILY_LIMIT_SECONDS) {
         setGameState('time-limit');
         if (room) {
           setRoom(null);
         }
-      }
-      
-      if (newTime % 10 === 0) {
+        // Persist final value
+        const playerRef = doc(firestore, 'players', user.uid);
+        updateDoc(playerRef, { playtimeToday: newTime, lastPlayedDate: newDate }).catch(() => {});
+      } else if (newTime % 10 === 0) {
         const playerRef = doc(firestore, 'players', user.uid);
         updateDoc(playerRef, { playtimeToday: newTime, lastPlayedDate: newDate }).catch(() => {});
       }
@@ -3141,14 +3214,38 @@ export default function App() {
       console.error("Leave Room Error:", error);
     }
   };
-  // Wraps an "enter game" action with the mobile-rotate prompt
+  // Wraps an "enter game" action with the mobile-rotate prompt + time-limit guard
   const beginGameWithRotationCheck = (action: () => void) => {
     triggerHaptic();
+    // Block if non-VIP user has exhausted today's free time
+    if (!playerData?.isVIP && remainingSeconds <= 0) {
+      setGameState('time-limit');
+      return;
+    }
     if (isTouch && !isLandscape) {
       setPendingStartAction(() => action);
       setShowRotatePrompt(true);
     } else {
       action();
+    }
+  };
+
+  // Centralized VIP checkout call (used by time-limit screen, menu and rotate prompt)
+  const handleBuyVip = async () => {
+    try {
+      const response = await fetch(import.meta.env.VITE_API_URL + '/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user?.uid, email: user?.email })
+      });
+      const data = await response.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert('Erro ao gerar checkout. Tente novamente mais tarde.');
+      }
+    } catch (e) {
+      alert('Erro de conexão com o servidor de pagamentos.');
     }
   };
 
@@ -3567,49 +3664,67 @@ export default function App() {
         )}
 
         {gameState === 'time-limit' && (
-          <motion.div 
+          <motion.div
             key="time-limit-screen"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] p-4 text-center"
+            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] p-4 text-center overflow-y-auto"
           >
-            <div className="w-24 h-24 rounded-full bg-yellow-500/10 flex items-center justify-center border-2 border-yellow-500 mb-6">
+            <div className="w-24 h-24 rounded-full bg-yellow-500/10 flex items-center justify-center border-2 border-yellow-500 mb-6 animate-pulse">
               <Timer className="w-12 h-12 text-yellow-500" />
             </div>
-            <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic mb-4">Tempo Esgotado</h1>
+            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic mb-4">Tempo Esgotado</h1>
             <p className="text-white/60 max-w-md mx-auto mb-8 leading-relaxed">
-              Você atingiu o limite de 30 minutos diários gratuitos.<br/><br/>
-              Assine o plano <span className="text-[#bc13fe] font-black uppercase">Tryhard VIP</span> (R$ 14,90/mês) para jogar ilimitado todos os dias!
+              Você atingiu o limite de <span className="text-white font-black">30 minutos diários</span> gratuitos.<br/><br/>
+              Assine o plano <span className="text-[#bc13fe] font-black uppercase">Tryhard VIP</span> (R$ 14,90/mês) para jogar <span className="text-yellow-400 font-black">ilimitado</span> todos os dias!
             </p>
+
+            {/* VIP benefits */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-md mb-8">
+              {[
+                { icon: Timer, label: 'Tempo Ilimitado' },
+                { icon: Crown, label: 'Selo VIP' },
+                { icon: Star, label: 'Skins Exclusivas' }
+              ].map((b, i) => (
+                <div key={i} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
+                  <b.icon className="w-4 h-4 text-yellow-400" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-yellow-300">{b.label}</span>
+                </div>
+              ))}
+            </div>
+
             <div className="flex flex-col gap-4 w-full max-w-xs">
-              <button 
-                onClick={async () => {
-                  // Lógica para chamar API de checkout do Mercado Pago / Backend
-                  try {
-                    const response = await fetch(import.meta.env.VITE_API_URL + '/api/checkout', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ uid: user?.uid, email: user?.email })
-                    });
-                    const data = await response.json();
-                    if (data.checkoutUrl) {
-                      window.location.href = data.checkoutUrl;
-                    } else {
-                      alert('Erro ao gerar checkout. Tente novamente mais tarde.');
-                    }
-                  } catch (e) {
-                    alert('Erro de conexão com o servidor de pagamentos.');
-                  }
-                }}
-                className="w-full py-4 bg-[#bc13fe] text-white rounded-xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(188,19,254,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+              <button
+                onClick={handleBuyVip}
+                className="w-full py-4 bg-gradient-to-r from-[#bc13fe] to-[#8007cf] text-white rounded-xl font-black uppercase tracking-widest shadow-[0_0_30px_rgba(188,19,254,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <ShoppingBag className="w-5 h-5" />
-                ASSINAR VIP
+                <Crown className="w-5 h-5 text-yellow-300" />
+                ASSINAR VIP - R$ 14,90/mês
               </button>
-              <button 
+              <button
+                onClick={async () => {
+                  // Voltar para o menu e re-checar VIP (caso o webhook já tenha processado)
+                  if (user && isOnline) {
+                    try {
+                      const snap = await getDoc(doc(firestore, 'players', user.uid));
+                      if (snap.exists() && (snap.data() as any).isVIP) {
+                        setPlayerData(snap.data() as any);
+                        setGameState('menu');
+                        setPaymentReturnToast({ type: 'success' });
+                        return;
+                      }
+                    } catch (e) { /* silent */ }
+                  }
+                  setGameState('menu');
+                }}
+                className="w-full py-3 bg-white/5 border border-white/10 text-white/80 rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer text-sm"
+              >
+                Já sou VIP? Verificar
+              </button>
+              <button
                 onClick={() => auth.signOut()}
-                className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
+                className="w-full py-3 bg-transparent text-white/30 hover:text-white/60 transition-colors text-[10px] font-black uppercase tracking-[0.3em]"
               >
                 Sair da Conta
               </button>
@@ -3714,18 +3829,47 @@ export default function App() {
             </div>
 
             {/* Top Navigation Bar */}
-            <div className="w-full flex justify-between items-center z-10 border-b border-white/5 pb-4 mb-4">
+            <div className="w-full flex justify-between items-center z-10 border-b border-white/5 pb-4 mb-4 gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
                 <span className="text-[9px] font-black uppercase tracking-[0.25em] text-white/50">Servidor Principal: ONLINE</span>
               </div>
-              
-              {!isOnline && (
-                <div className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                  <WifiOff size={10} className="text-red-400" />
-                  <span className="text-[8px] font-black uppercase tracking-widest text-red-400">Modo Offline</span>
-                </div>
-              )}
+
+              <div className="flex items-center gap-2">
+                {/* Daily playtime status */}
+                {playerData?.isVIP ? (
+                  <div className="px-3 py-1 bg-yellow-500/15 border border-yellow-400/40 rounded-lg flex items-center gap-1.5 shadow-[0_0_12px_rgba(234,179,8,0.25)]">
+                    <Crown className="w-3 h-3 text-yellow-400" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-yellow-400">VIP Ilimitado</span>
+                  </div>
+                ) : (
+                  <div className={`px-3 py-1 rounded-lg flex items-center gap-1.5 border ${
+                    remainingSeconds <= 60
+                      ? 'bg-red-500/15 border-red-400/40 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                      : remainingSeconds <= 300
+                      ? 'bg-yellow-500/15 border-yellow-400/40 shadow-[0_0_12px_rgba(234,179,8,0.25)]'
+                      : 'bg-white/5 border-white/10'
+                  }`}>
+                    <Timer className={`w-3 h-3 ${
+                      remainingSeconds <= 60 ? 'text-red-400 animate-pulse' :
+                      remainingSeconds <= 300 ? 'text-yellow-400' : 'text-cyan-400'
+                    }`} />
+                    <span className={`text-[8px] font-black uppercase tracking-widest tabular-nums ${
+                      remainingSeconds <= 60 ? 'text-red-300' :
+                      remainingSeconds <= 300 ? 'text-yellow-300' : 'text-white/60'
+                    }`}>
+                      {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')} grátis
+                    </span>
+                  </div>
+                )}
+
+                {!isOnline && (
+                  <div className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                    <WifiOff size={10} className="text-red-400" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-red-400">Modo Offline</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Main Dashboard Layout */}
@@ -3798,21 +3942,9 @@ export default function App() {
 
                   {/* ASSINAR VIP */}
                   {!playerData?.isVIP && (
-                    <motion.button 
+                    <motion.button
                       whileHover={{ x: 6 }}
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(import.meta.env.VITE_API_URL + '/api/checkout', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ uid: user?.uid, email: user?.email })
-                          });
-                          const data = await response.json();
-                          if (data.checkoutUrl) window.location.href = data.checkoutUrl;
-                        } catch (e) {
-                          alert('Erro ao conectar com servidor de pagamento.');
-                        }
-                      }}
+                      onClick={handleBuyVip}
                       className="w-full text-left py-3 px-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 hover:border-yellow-500 hover:bg-yellow-500/20 flex items-center justify-between group transition-all duration-300 relative overflow-hidden shadow-[0_0_15px_rgba(234,179,8,0.2)]"
                     >
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
@@ -3820,8 +3952,19 @@ export default function App() {
                         <span className="text-yellow-500 text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">SEJA VIP</span>
                         <span className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Remover Limite de Tempo</span>
                       </div>
-                      <Globe size={14} className="text-yellow-500 animate-pulse" />
+                      <Crown size={14} className="text-yellow-500 animate-pulse" />
                     </motion.button>
+                  )}
+                  {playerData?.isVIP && (
+                    <motion.div
+                      className="w-full py-2.5 px-4 rounded-xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/15 to-yellow-600/5 flex items-center gap-2"
+                    >
+                      <Crown className="w-4 h-4 text-yellow-400" />
+                      <div>
+                        <div className="text-yellow-400 text-[10px] font-black uppercase tracking-widest">Tryhard VIP Ativo</div>
+                        <div className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest">Jogo ilimitado todos os dias</div>
+                      </div>
+                    </motion.div>
                   )}
 
                   {/* CHAT GLOBAL */}
@@ -5152,6 +5295,79 @@ export default function App() {
           <div className="fixed top-24 right-4 md:right-8 z-[200]">
             <NotificationCenter notifications={notifications} onClose={() => setShowNotifications(false)} />
           </div>
+        )}
+
+        {/* Payment return toast (Cakto) */}
+        {paymentReturnToast.type && (
+          <motion.div
+            key="payment-toast"
+            initial={{ y: -60, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -60, opacity: 0, scale: 0.9 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[500] pointer-events-auto"
+          >
+            <div className={`px-5 py-3 rounded-2xl backdrop-blur-xl border shadow-2xl flex items-center gap-3 ${
+              paymentReturnToast.type === 'success'
+                ? 'bg-green-500/15 border-green-400/40 shadow-[0_0_30px_rgba(34,197,94,0.3)]'
+                : 'bg-red-500/15 border-red-400/40 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
+            }`}>
+              {paymentReturnToast.type === 'success' ? (
+                <Crown className="w-5 h-5 text-yellow-400 drop-shadow-[0_0_8px_rgba(255,234,0,0.6)]" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              )}
+              <div className="text-left">
+                <div className={`text-[10px] font-black uppercase tracking-widest ${
+                  paymentReturnToast.type === 'success' ? 'text-green-300' : 'text-red-300'
+                }`}>
+                  {paymentReturnToast.type === 'success' ? 'Pagamento Confirmado' : 'Pagamento Não Concluído'}
+                </div>
+                <div className="text-xs text-white/80 font-bold">
+                  {paymentReturnToast.type === 'success'
+                    ? 'Atualizando seu status VIP...'
+                    : 'Tente novamente ou escolha outro método.'}
+                </div>
+              </div>
+              <button
+                onClick={() => setPaymentReturnToast({ type: null })}
+                className="ml-2 text-white/40 hover:text-white transition-colors"
+                aria-label="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Playtime warning banners (5 min / 1 min remaining) */}
+        {gameState === 'playing' && playtimeWarning && !playerData?.isVIP && (
+          <motion.div
+            key={`warning-${playtimeWarning}`}
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[180] pointer-events-none"
+          >
+            <div className={`px-4 py-2 rounded-xl backdrop-blur-xl border flex items-center gap-2 ${
+              playtimeWarning === '1min'
+                ? 'bg-red-500/20 border-red-400/50 shadow-[0_0_25px_rgba(239,68,68,0.4)]'
+                : 'bg-yellow-500/20 border-yellow-400/50 shadow-[0_0_25px_rgba(234,179,8,0.4)]'
+            }`}>
+              <Timer className={`w-4 h-4 ${playtimeWarning === '1min' ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`} />
+              <span className={`text-[11px] font-black uppercase tracking-wider ${
+                playtimeWarning === '1min' ? 'text-red-300' : 'text-yellow-300'
+              }`}>
+                {playtimeWarning === '1min' ? 'Último minuto de jogo grátis!' : 'Faltam 5 min de jogo grátis'}
+              </span>
+              <button
+                onClick={() => setPlaytimeWarning(null)}
+                className="ml-2 text-white/50 hover:text-white pointer-events-auto"
+                aria-label="Fechar aviso"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </motion.div>
         )}
 
         {showRewardAdModal && (

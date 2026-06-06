@@ -88,9 +88,11 @@ app.post('/api/gemini', async (req, res) => {
 // Cakto API Checkout Endpoint
 app.post('/api/checkout', async (req, res) => {
   const { uid, email } = req.body;
-  
+
   try {
-    // Retorna o link de checkout estático com os parâmetros do usuário para rastreio
+    // Retorna o link de checkout estático com os parâmetros do usuário para rastreio.
+    // IMPORTANTE: configure a URL de retorno (post-purchase redirect) no painel da Cakto
+    // para apontar de volta para o frontend, ex: https://tryhardacademy.app/?payment=success
     const checkoutBaseUrl = 'https://pay.cakto.com.br/u5h6im8_850195';
     const checkoutUrl = `${checkoutBaseUrl}?email=${encodeURIComponent(email || '')}&src=${uid}`;
 
@@ -98,6 +100,24 @@ app.post('/api/checkout', async (req, res) => {
   } catch (error) {
     console.error('Error generating checkout:', error);
     res.status(500).json({ error: 'Failed to generate checkout link.' });
+  }
+});
+
+// Endpoint para o frontend checar manualmente o status VIP (útil após retorno do checkout)
+app.get('/api/vip-status/:uid', async (req, res) => {
+  if (!db) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+  try {
+    const snap = await db.collection('players').doc(req.params.uid).get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Player not found', isVIP: false });
+    }
+    const data = snap.data() || {};
+    res.json({ isVIP: !!data.isVIP, updatedAt: data.updatedAt || null });
+  } catch (error) {
+    console.error('Error checking VIP status:', error);
+    res.status(500).json({ error: 'Failed to check VIP status.' });
   }
 });
 
