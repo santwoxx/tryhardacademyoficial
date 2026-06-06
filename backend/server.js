@@ -2,11 +2,29 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import admin from 'firebase-admin';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Initialize Firebase Admin SDK
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('Firebase Admin SDK initialized successfully.');
+  } catch (error) {
+    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', error);
+  }
+} else {
+  console.warn('FIREBASE_SERVICE_ACCOUNT is not defined. Webhook database updates will not work.');
+}
+
+const db = admin.apps.length ? admin.firestore() : null;
 
 // Allow CORS requests from the Vercel frontend
 app.use(cors({
@@ -117,6 +135,76 @@ app.post('/api/checkout', async (req, res) => {
   } catch (error) {
     console.error('Error generating checkout from Cakto:', error);
     res.status(500).json({ error: 'Failed to generate checkout link.' });
+  }
+});
+
+// Cakto Webhook Endpoint (Processa compras e ativa o VIP)
+app.post('/webhooks/cakto', async (req, res) => {
+  const payload = req.body;
+  console.log('Recebido webhook da Cakto:', JSON.stringify(payload, null, 2));
+
+  // Validação de segurança com Chave Secreta do Webhook
+  const webhookSecret = process.env.CAKTO_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    const authHeader = req.headers['authorization'] || req.headers['x-webhook-secret'] || req.headers['webhook-secret'];
+    if (authHeader !== webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
+      console.error('Webhook bloqueado: Chave secreta inválida.');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
+  if (!db) {
+    console.error('Firebase Admin não está inicializado!');
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  try {
+    const eventType = payload.event || payload.type;
+    const data = payload.data || payload;
+
+    const approvedEvents = ['purchase_approved', 'subscription_created', 'subscription_renewed'];
+    const canceledEvents = ['purchase_refused', 'subscription_canceled', 'subscription_expired', 'purchase_refunded', 'chargeback'];
+
+    let isVIP = false;
+    let shouldUpdate = false;
+
+    if (approvedEvents.includes(eventType)) {
+      isVIP = true;
+      shouldUpdate = true;
+    } else if (canceledEvents.includes(eventType)) {
+      isVIP = false;
+      shouldUpdate = true;
+    }
+
+    if (shouldUpdate) {
+      // A Cakto envia os parâmetros da URL no `src` ou `tracking.src`
+      const src = data.src || (data.tracking && data.tracking.src) || (data.metadata && data.metadata.src);
+      const email = data.customer?.email || data.client?.email || data.email;
+
+      if (src) {
+        // Atualiza o jogador no Firestore via UID
+        await db.collection('players').doc(src).update({ isVIP });
+        console.log(`[Cakto Webhook] Jogador ${src} teve VIP atualizado para: ${isVIP}`);
+      } else if (email) {
+        // Fallback: Busca o jogador pelo e-mail
+        const snapshot = await db.collection('players').where('email', '==', email).get();
+        if (!snapshot.empty) {
+          snapshot.forEach(async (doc) => {
+            await doc.ref.update({ isVIP });
+            console.log(`[Cakto Webhook] Jogador ${doc.id} (E-mail: ${email}) teve VIP atualizado para: ${isVIP}`);
+          });
+        } else {
+          console.warn(`[Cakto Webhook] E-mail ${email} não encontrado no banco de dados para ativar o VIP.`);
+        }
+      } else {
+        console.warn('[Cakto Webhook] O payload não continha src (UID) nem e-mail.', data);
+      }
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Erro ao processar o webhook da Cakto:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 
