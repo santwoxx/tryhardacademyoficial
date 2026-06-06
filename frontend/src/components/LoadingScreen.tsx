@@ -254,7 +254,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, level })
               transition={{ delay: 0.1 }}
               className="text-xl font-black text-white mb-2 tracking-tight italic"
             >
-              PREPARANDO NÍVEL {level}
+              PREPARANDO ARENA
             </motion.h3>
             <motion.div 
               initial={{ opacity: 0 }}
