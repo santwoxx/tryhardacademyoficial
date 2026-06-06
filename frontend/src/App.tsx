@@ -4071,40 +4071,40 @@ export default function App() {
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-[#bc13fe]/10 blur-[80px] rounded-full pointer-events-none" />
 
                   {/* Profile Header */}
-                  <div className="w-full flex items-center justify-between border-b border-white/5 pb-4 z-10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#bc13fe] to-[#8a00ff] flex items-center justify-center border border-white/10 shadow-[0_0_20px_rgba(188,19,254,0.3)]">
-                        <User size={20} className="text-white" />
+                  <div className="w-full flex items-center justify-between border-b border-white/5 pb-3 z-10">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#bc13fe] to-[#8a00ff] flex items-center justify-center border border-white/10 shadow-[0_0_20px_rgba(188,19,254,0.3)]">
+                        <User size={16} className="text-white" />
                       </div>
-                      <div className="flex flex-col text-left">
-                        <span className="text-base font-black text-white italic tracking-wide uppercase leading-none">{nickname || 'CONECTANDO...'}</span>
-                        <span className="text-[9px] font-black uppercase tracking-widest text-[#bc13fe] mt-1">RECRUTA • NÍVEL {currentLevel}</span>
+                      <div className="flex flex-col text-left min-w-0">
+                        <span className="text-sm font-black text-white italic tracking-wide uppercase leading-none truncate max-w-[120px]">{nickname || 'CONECTANDO...'}</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-[#bc13fe] mt-1">RECRUTA • NÍVEL {currentLevel}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-[#ffea00]/10 border border-[#ffea00]/30 rounded-xl px-4 py-2 hover:bg-[#ffea00]/20 transition-all">
-                      <Trophy size={14} className="text-[#ffea00] drop-shadow-[0_0_8px_rgba(255,234,0,0.5)]" />
-                      <span className="text-white text-sm font-black italic tracking-tight tabular-nums">{trophies}</span>
+                    <div className="flex items-center gap-1.5 bg-[#ffea00]/10 border border-[#ffea00]/30 rounded-lg px-2.5 py-1.5 hover:bg-[#ffea00]/20 transition-all">
+                      <Trophy size={12} className="text-[#ffea00] drop-shadow-[0_0_8px_rgba(255,234,0,0.5)]" />
+                      <span className="text-white text-xs font-black italic tracking-tight tabular-nums">{trophies}</span>
                     </div>
                   </div>
 
                   {/* Custom Character Preview */}
-                  <div className="my-2 relative flex items-center justify-center w-full z-10">
+                  <div className="my-1 relative flex items-center justify-center w-full z-10">
                     <MainMenuSkinShowcase skinId={currentSkinId} size={180} />
-                    
+
                     <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 bg-white/5 border border-white/10 rounded-full py-1 px-4 text-[8px] font-black text-white/50 uppercase tracking-widest select-none shadow-lg">
                       Visualização do Avatar
                     </div>
                   </div>
 
-                  {/* Stats Grid */}
-                  <div className="w-full grid grid-cols-2 gap-3 mt-6 border-t border-white/5 pt-4 z-10">
-                    <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl text-center">
-                      <span className="text-[8px] font-black uppercase text-white/30 tracking-widest block mb-1">Partidas</span>
-                      <span className="text-lg font-black text-white font-mono italic">{matchCount}</span>
+                  {/* Stats Grid - more compact */}
+                  <div className="w-full grid grid-cols-2 gap-2 mt-4 border-t border-white/5 pt-3 z-10">
+                    <div className="bg-white/[0.02] border border-white/5 px-2 py-2 rounded-xl text-center">
+                      <span className="text-[7px] font-black uppercase text-white/30 tracking-widest block mb-0.5">Partidas</span>
+                      <span className="text-sm font-black text-white font-mono italic leading-none">{matchCount}</span>
                     </div>
-                    <div className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl text-center">
-                      <span className="text-[8px] font-black uppercase text-white/30 tracking-widest block mb-1">Tempo de Jogo</span>
-                      <span className="text-lg font-black text-[#00f2ff] font-mono italic">{Math.floor(totalTimePlayed / 60)}m</span>
+                    <div className="bg-white/[0.02] border border-white/5 px-2 py-2 rounded-xl text-center">
+                      <span className="text-[7px] font-black uppercase text-white/30 tracking-widest block mb-0.5">Tempo de Jogo</span>
+                      <span className="text-sm font-black text-[#00f2ff] font-mono italic leading-none">{Math.floor(totalTimePlayed / 60)}m</span>
                     </div>
                   </div>
                 </motion.div>
@@ -4648,118 +4648,153 @@ export default function App() {
         )}
 
         {showSettings && (
-          <motion.div 
+          <motion.div
             key="settings-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md p-3"
+            onClick={() => setShowSettings(false)}
           >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
+            <motion.div
+              initial={{ scale: 0.92, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-[#0a0a0a] border border-white/10 p-5 rounded-3xl w-full max-w-xs shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-gradient-to-b from-zinc-900/95 to-black/95 border border-white/10 rounded-2xl w-full max-w-[17rem] sm:max-w-xs shadow-[0_0_60px_rgba(188,19,254,0.15)] overflow-hidden"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-black uppercase tracking-widest text-white">Ajustes</h2>
-                <button onClick={() => setShowSettings(false)}><X className="w-5 h-5 text-white/50 hover:text-white transition" /></button>
+              {/* Glow accent */}
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-32 h-32 bg-[#bc13fe]/20 blur-[60px] rounded-full pointer-events-none" />
+
+              {/* Header */}
+              <div className="relative flex justify-between items-center px-4 py-3 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-[#bc13fe]/20 border border-[#bc13fe]/30 flex items-center justify-center">
+                    <Settings size={14} className="text-[#bc13fe]" />
+                  </div>
+                  <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Ajustes</h2>
+                </div>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
+                  aria-label="Fechar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-2 font-bold">Seu Nickname (Permanente)</label>
-                  <div className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-bold tracking-widest opacity-70">
-                    {nickname || 'Carregando...'}
+              <div className="relative p-3 space-y-1.5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                {/* Nickname */}
+                <div className="flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <User className="w-3.5 h-3.5 text-[#bc13fe] shrink-0" />
+                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Nick</span>
                   </div>
+                  <span className="text-xs font-black text-white tracking-wider truncate ml-2">{nickname || '...'}</span>
                 </div>
 
-                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-4">
+                {/* Trophies */}
+                <div className="flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors">
                   <div className="flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-[#ffea00]" />
-                    <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Troféus</span>
+                    <Trophy className="w-3.5 h-3.5 text-[#ffea00]" />
+                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Troféus</span>
                   </div>
-                  <span className="text-white font-black tracking-widest">{trophies}</span>
+                  <span className="text-xs font-black text-white tracking-wider tabular-nums">{trophies}</span>
                 </div>
 
-                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-4">
+                {/* Audio toggle */}
+                <button
+                  onClick={() => setIsMuted(!isMuted)}
+                  className="w-full flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors"
+                >
                   <div className="flex items-center gap-2">
-                    {isMuted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4 text-[#00f2ff]" />}
-                    <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Áudio</span>
+                    {isMuted
+                      ? <VolumeX className="w-3.5 h-3.5 text-red-500" />
+                      : <Volume2 className="w-3.5 h-3.5 text-[#00f2ff]" />}
+                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Áudio</span>
                   </div>
-                  <button 
-                    onClick={() => setIsMuted(!isMuted)}
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                      isMuted ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'bg-[#00f2ff]/20 text-[#00f2ff] border border-[#00f2ff]/30'
-                    }`}
-                  >
-                    {isMuted ? 'Mudo' : 'Ligado'}
-                  </button>
-                </div>
+                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                    isMuted
+                      ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                      : 'bg-[#00f2ff]/15 text-[#00f2ff] border border-[#00f2ff]/20'
+                  }`}>
+                    {isMuted ? 'Mudo' : 'On'}
+                  </span>
+                </button>
 
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-2 font-bold">Qualidade Gráfica</label>
-                  <div className="grid grid-cols-3 gap-2">
+                {/* Quality */}
+                <div className="bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Maximize2 className="w-3.5 h-3.5 text-white/40" />
+                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Qualidade</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
                     {deduplicateItems(['low', 'medium', 'high'] as GraphicQuality[], (q) => `quality-opt-${q}`, 'GraphicQualityOptions').map((q) => (
                       <button
                         key={`quality-opt-${q}`}
                         onClick={() => setQuality(q)}
-                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                          quality === q 
-                            ? 'bg-[#bc13fe] border-[#bc13fe] text-white shadow-[0_0_15px_rgba(188,19,254,0.3)]' 
-                            : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                        className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all ${
+                          quality === q
+                            ? 'bg-[#bc13fe] border-[#bc13fe] text-white shadow-[0_0_12px_rgba(188,19,254,0.4)]'
+                            : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
                         }`}
                       >
-                        {q === 'low' ? 'Baixo' : q === 'medium' ? 'Médio' : 'Alto'}
+                        {q === 'low' ? 'Baixo' : q === 'medium' ? 'Méd' : 'Alto'}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <button 
+                {/* HUD Customizer */}
+                <button
                   onClick={() => {
                     setShowSettings(false);
                     setIsCustomizingHUD(true);
                   }}
-                  className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white/10 transition-all group"
+                  className="w-full flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors group"
                 >
-                  <Move className="w-5 h-5 text-[#00f2ff] group-hover:rotate-12 transition-transform" />
-                  Configurar HUD Mobile
+                  <div className="flex items-center gap-2">
+                    <Move className="w-3.5 h-3.5 text-[#00f2ff] group-hover:rotate-12 transition-transform" />
+                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">HUD Mobile</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-white/30" />
                 </button>
 
-                <button 
+                {/* Save (primary) */}
+                <button
                   onClick={saveSettings}
-                  className="w-full py-4 bg-[#bc13fe] text-white rounded-xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(188,19,254,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  className="w-full py-2.5 mt-2 bg-gradient-to-r from-[#bc13fe] to-[#8a00ff] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(188,19,254,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   Salvar Alterações
                 </button>
 
-                <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-white/10">
+                {/* Secondary actions */}
+                <div className="grid grid-cols-2 gap-1.5 pt-1.5 mt-1 border-t border-white/5">
                   <button
                     onClick={() => {
                       setShowSettings(false);
                       setShowPrivacyPolicy(true);
                     }}
-                    className="w-full py-4 bg-white/5 border border-white/10 text-white/60 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white/10 transition-all"
+                    className="py-2 bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-white/50 hover:text-white/80 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <ShieldCheck className="w-5 h-5 text-white/40" />
-                    Política de Privacidade
+                    <ShieldCheck className="w-3 h-3" />
+                    Privacidade
                   </button>
-
                   <button
                     onClick={handleInstallClick}
-                    className="w-full py-4 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-cyan-500/20 transition-all"
+                    className="py-2 bg-cyan-500/[0.08] hover:bg-cyan-500/15 border border-cyan-500/20 text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <Download className="w-5 h-5" />
-                    Instalar Aplicativo
-                  </button>
-
-                  <button 
-                    onClick={handleLogout}
-                    className="w-full py-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
-                  >
-                    Sair da Conta
+                    <Download className="w-3 h-3" />
+                    Instalar
                   </button>
                 </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full py-2 bg-red-500/[0.08] hover:bg-red-500/15 border border-red-500/20 text-red-400 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <X className="w-3 h-3" />
+                  Sair da Conta
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -5079,57 +5114,106 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/98 backdrop-blur-3xl p-3 md:p-4 overflow-y-auto"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-3 md:p-4 overflow-y-auto"
+            onClick={() => { setShowGameOver(false); setGameState('menu'); }}
           >
             <motion.div
               initial={{ scale: 0.9, y: 40, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              className="bg-black/40 border border-red-500/40 p-5 md:p-8 landscape:p-4 rounded-[2rem] w-full max-w-md max-h-[95vh] overflow-y-auto text-center backdrop-blur-xl relative"
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-sm md:max-w-md landscape:max-w-lg bg-gradient-to-b from-red-950/30 via-black/85 to-black/95 border-2 border-red-500/30 rounded-3xl landscape:rounded-2xl p-5 md:p-6 landscape:p-4 text-center shadow-[0_0_80px_rgba(239,68,68,0.25)] overflow-hidden my-auto"
             >
-              <CornerDecoration className="text-red-500 -inset-4 opacity-100" />
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+              {/* Background effects */}
+              <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-red-500/25 blur-[100px] rounded-full pointer-events-none" />
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+              <CornerDecoration className="text-red-500/60 -inset-2" />
 
-              <div className="inline-block px-4 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.4em] mb-4 md:mb-6 landscape:mb-2 italic">
+              {/* Skull-style death icon */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                className="relative mx-auto mb-3 md:mb-4 landscape:mb-2 w-16 h-16 md:w-20 md:h-20 landscape:w-14 landscape:h-14 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.6)] border-2 border-red-400/50"
+              >
+                <Heart className="w-7 h-7 md:w-9 md:h-9 landscape:w-7 landscape:h-7 text-white fill-white" strokeWidth={0} />
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-black">
+                  <X className="w-3 h-3 text-black font-black" strokeWidth={4} />
+                </div>
+              </motion.div>
+
+              <div className="inline-block px-3 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 text-[8px] landscape:text-[9px] font-black uppercase tracking-[0.3em] mb-2 landscape:mb-1 rounded-full">
                 Sinal de Vida Perdido
               </div>
 
-              <h2 className="text-red-500 text-5xl md:text-6xl landscape:text-4xl font-black uppercase tracking-tighter italic mb-6 md:mb-8 landscape:mb-3 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]">
-                GAME<br/><span className="text-white">OVER</span>
+              <h2 className="text-red-500 text-4xl md:text-5xl landscape:text-3xl font-black uppercase tracking-tighter italic mb-1 landscape:mb-0 drop-shadow-[0_0_25px_rgba(239,68,68,0.5)] leading-none">
+                GAME <span className="text-white">OVER</span>
               </h2>
 
-              <div className="flex flex-col gap-2 mb-6 md:mb-8 landscape:mb-3 landscape:flex-row landscape:gap-2">
+              {/* XP earned highlight */}
+              <div className="my-3 md:my-4 landscape:my-2 flex items-center justify-center gap-2">
+                <Zap className="w-4 h-4 landscape:w-3.5 landscape:h-3.5 text-yellow-400 fill-yellow-400" />
+                <span className="text-xs landscape:text-[10px] font-black uppercase tracking-widest text-yellow-400">+{stats.kills * 25 + survivalTime * 2} XP</span>
+                <div className="flex-1 max-w-[80px] h-1 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (stats.kills * 25 + survivalTime * 2) / 5)}%` }}
+                    transition={{ delay: 0.3, duration: 0.8 }}
+                    className="h-full bg-gradient-to-r from-yellow-400 to-[#bc13fe]"
+                  />
+                </div>
+              </div>
+
+              {/* Stats - horizontal on mobile, grid on landscape */}
+              <div className="grid grid-cols-3 gap-1.5 md:gap-2 landscape:gap-2 mb-4 md:mb-5 landscape:mb-3">
                 {[
-                  { label: 'Oponentes', val: stats.kills, icon: Target, color: 'text-cyan-400' },
-                  { label: 'Tempo', val: `${survivalTime}s`, icon: Timer, color: 'text-yellow-400' },
-                  { label: 'Recorde', val: highScore, icon: Trophy, color: 'text-[#bc13fe]' }
+                  { label: 'Elims', val: stats.kills, icon: Target, color: 'from-cyan-500/20 to-cyan-500/5', iconColor: 'text-cyan-400', border: 'border-cyan-500/20' },
+                  { label: 'Tempo', val: `${survivalTime}s`, icon: Timer, color: 'from-yellow-500/20 to-yellow-500/5', iconColor: 'text-yellow-400', border: 'border-yellow-500/20' },
+                  { label: 'Recorde', val: highScore, icon: Trophy, color: 'from-[#bc13fe]/20 to-[#bc13fe]/5', iconColor: 'text-[#bc13fe]', border: 'border-[#bc13fe]/20' }
                 ].map((stat, i) => (
-                  <div key={i} className="hud-card !bg-black/60 flex justify-between items-center group landscape:flex-col landscape:items-center landscape:gap-0 landscape:!py-1.5 landscape:!px-2 flex-1">
-                    <div className="flex items-center gap-2 landscape:gap-1">
-                      <stat.icon className={`w-3.5 h-3.5 landscape:w-3 landscape:h-3 ${stat.color} opacity-60`} />
-                      <span className="text-[9px] landscape:text-[8px] font-black text-white/40 uppercase tracking-widest">{stat.label}</span>
-                    </div>
-                    <span className="text-base landscape:text-sm font-black text-white italic tabular-nums">{stat.val}</span>
-                  </div>
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + i * 0.08 }}
+                    className={`relative bg-gradient-to-b ${stat.color} border ${stat.border} rounded-xl landscape:rounded-lg p-2.5 landscape:p-2 flex flex-col items-center gap-0.5 landscape:gap-0 backdrop-blur-sm`}
+                  >
+                    <stat.icon className={`w-4 h-4 landscape:w-3.5 landscape:h-3.5 ${stat.iconColor}`} />
+                    <span className="text-[8px] landscape:text-[7px] font-black text-white/40 uppercase tracking-widest">{stat.label}</span>
+                    <span className="text-lg landscape:text-base font-black text-white italic tabular-nums leading-none">{stat.val}</span>
+                  </motion.div>
                 ))}
               </div>
 
-              <div className="flex flex-col gap-2 md:gap-3 landscape:gap-2 landscape:flex-row">
+              {/* New record badge */}
+              {stats.kills > 0 && stats.kills >= highScore && (
+                <motion.div
+                  initial={{ scale: 0, rotate: -10 }}
+                  animate={{ scale: 1, rotate: -3 }}
+                  transition={{ delay: 0.5, type: 'spring' }}
+                  className="mb-3 landscape:mb-2 mx-auto inline-block px-3 py-1 bg-gradient-to-r from-[#bc13fe] to-pink-500 text-white text-[9px] landscape:text-[8px] font-black uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(188,19,254,0.5)]"
+                >
+                  ⭐ Novo Recorde!
+                </motion.div>
+              )}
+
+              {/* Actions */}
+              <div className="flex flex-col gap-2 landscape:gap-1.5">
                 <button
                   onClick={handleRestart}
-                  className="game-btn-danger py-3 md:py-5 landscape:py-2 text-base md:text-lg landscape:text-sm shadow-[0_0_40px_rgba(239,68,68,0.4)] flex-1 landscape:flex-none"
+                  className="w-full py-3.5 landscape:py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl text-sm landscape:text-xs font-black uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-red-400/50"
                 >
-                  <Zap className="w-5 h-5 landscape:w-4 landscape:h-4 fill-white" />
+                  <Zap className="w-4 h-4 fill-white" />
                   REINICIAR
                 </button>
-
                 <button
                   onClick={() => {
                     setShowGameOver(false);
                     setGameState('menu');
                   }}
-                  className="text-white/30 hover:text-white transition-colors text-[10px] font-black uppercase tracking-[0.4em] mt-2 landscape:mt-0 underline decoration-red-500/30 underline-offset-8"
+                  className="w-full py-2.5 landscape:py-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-white/60 hover:text-white rounded-xl text-[10px] landscape:text-[9px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
                 >
-                  SAIR PARA O MENU
+                  <ArrowLeft className="w-3 h-3" />
+                  Voltar ao Menu
                 </button>
               </div>
             </motion.div>
@@ -5143,86 +5227,158 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-3 md:p-4 overflow-y-auto"
+            onClick={() => !feedback && handleAnswer(null as any)}
           >
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.92, y: 20 }}
               animate={{
                 scale: 1,
                 y: 0,
                 x: feedback === 'wrong' || feedback === 'timeout' ? [0, -10, 10, -10, 10, 0] : 0
               }}
-              className={`relative bg-black/40 border-2 ${
-                feedback === 'correct' ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.3)]' :
-                feedback === 'wrong' || feedback === 'timeout' ? 'border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)]' :
-                'border-cyan-400 shadow-[0_0_50px_rgba(0,242,255,0.3)]'
-              } p-5 md:p-8 landscape:p-4 rounded-[2rem] w-full max-w-md max-h-[95vh] overflow-y-auto backdrop-blur-3xl overflow-hidden`}
+              transition={{ x: { duration: 0.4 } }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-sm md:max-w-md landscape:max-w-lg bg-gradient-to-b ${
+                feedback === 'correct'
+                  ? 'from-green-950/30 via-black/85 to-black/95 border-green-500/50'
+                  : feedback === 'wrong' || feedback === 'timeout'
+                  ? 'from-red-950/30 via-black/85 to-black/95 border-red-500/50'
+                  : 'from-cyan-950/20 via-black/85 to-black/95 border-cyan-500/40'
+              } border-2 rounded-3xl landscape:rounded-2xl p-5 md:p-6 landscape:p-4 backdrop-blur-3xl overflow-hidden shadow-[0_0_60px_rgba(0,242,255,0.15)] my-auto`}
             >
+              {/* Background effects */}
+              <div className={`absolute -top-16 left-1/2 -translate-x-1/2 w-40 h-40 blur-[80px] rounded-full pointer-events-none ${
+                feedback === 'correct' ? 'bg-green-500/30' :
+                feedback === 'wrong' || feedback === 'timeout' ? 'bg-red-500/30' : 'bg-cyan-500/20'
+              }`} />
               <CornerDecoration className={`${
-                feedback === 'correct' ? 'text-green-500' :
-                feedback === 'wrong' || feedback === 'timeout' ? 'text-red-500' : 'text-cyan-400'
-              } -inset-4 opacity-100`} />
+                feedback === 'correct' ? 'text-green-500/60' :
+                feedback === 'wrong' || feedback === 'timeout' ? 'text-red-500/60' : 'text-cyan-400/60'
+              } -inset-2`} />
 
-              {/* Header */}
-              <div className="flex justify-between items-center mb-4 md:mb-6 landscape:mb-2">
-                <div className="flex items-center gap-2 landscape:gap-1.5 bg-black/60 px-3 py-1.5 landscape:px-2 landscape:py-1 rounded-xl border border-white/5">
-                  <div className={`w-2 h-2 rounded-full animate-pulse ${
-                    currentQuestion.difficulty === 'easy' ? 'bg-green-400' :
-                    currentQuestion.difficulty === 'medium' ? 'bg-yellow-400' : 'bg-red-400'
-                  }`} />
-                  <span className="text-[10px] landscape:text-[8px] uppercase font-black tracking-[0.3em] text-white/60 italic">Nível: <span className="text-white ml-1 landscape:ml-0.5">
-                    {currentQuestion.difficulty === 'easy' ? 'MÍN' :
-                     currentQuestion.difficulty === 'medium' ? 'MÉD' : 'CRÍTICO'}
-                  </span></span>
+              {/* Top row: difficulty pill + timer ring + combo */}
+              <div className="relative flex justify-between items-start mb-4 md:mb-5 landscape:mb-2">
+                <div className="flex flex-col gap-1.5 landscape:gap-1">
+                  {/* Difficulty pill */}
+                  <div className={`flex items-center gap-1.5 landscape:gap-1 px-2.5 py-1 landscape:px-2 landscape:py-0.5 rounded-full border backdrop-blur-sm w-fit ${
+                    currentQuestion.difficulty === 'easy' ? 'bg-green-500/10 border-green-500/30' :
+                    currentQuestion.difficulty === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                    'bg-red-500/10 border-red-500/30'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                      currentQuestion.difficulty === 'easy' ? 'bg-green-400' :
+                      currentQuestion.difficulty === 'medium' ? 'bg-yellow-400' : 'bg-red-400'
+                    }`} />
+                    <span className={`text-[9px] landscape:text-[8px] font-black uppercase tracking-widest italic ${
+                      currentQuestion.difficulty === 'easy' ? 'text-green-400' :
+                      currentQuestion.difficulty === 'medium' ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {currentQuestion.difficulty === 'easy' ? 'Fácil' :
+                       currentQuestion.difficulty === 'medium' ? 'Médio' : 'Crítico'}
+                    </span>
+                  </div>
+                  {/* Subject tag */}
+                  {currentQuestion.subject && (
+                    <div className="flex items-center gap-1 text-[8px] landscape:text-[7px] uppercase tracking-widest text-white/40 font-bold px-1">
+                      <BookOpen className="w-2.5 h-2.5" />
+                      <span>
+                        {currentQuestion.subject === 'math' ? 'Matemática' :
+                         currentQuestion.subject === 'portuguese' ? 'Português' :
+                         currentQuestion.subject === 'science' ? 'Ciências' :
+                         currentQuestion.subject === 'history' ? 'História' :
+                         currentQuestion.subject === 'geography' ? 'Geografia' : 'Conhecimento'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div className={`flex flex-col items-end`}>
-                  <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-0.5 landscape:hidden">Timer</div>
-                  <div className={`text-xl landscape:text-lg font-black tabular-nums tracking-tighter ${timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
-                    00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
-                  </div>
+                {/* Circular timer */}
+                <div className="relative w-11 h-11 landscape:w-9 landscape:h-9 flex items-center justify-center">
+                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/10" />
+                    <motion.circle
+                      cx="18" cy="18" r="15" fill="none" strokeWidth="2.5" strokeLinecap="round"
+                      className={timeLeft <= 3 ? 'text-red-500' : 'text-cyan-400'}
+                      style={{ filter: `drop-shadow(0 0 4px currentColor)` }}
+                      strokeDasharray="94.2"
+                      initial={false}
+                      animate={{ strokeDashoffset: 94.2 - (94.2 * timeLeft) / 30 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </svg>
+                  <span className={`relative text-xs landscape:text-[10px] font-black tabular-nums ${
+                    timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-white'
+                  }`}>
+                    {timeLeft}
+                  </span>
                 </div>
               </div>
 
-              {/* Combo Multiplier */}
+              {/* Combo Multiplier (floating) */}
               <AnimatePresence>
                 {combo > 1 && !feedback && (
                   <motion.div
                     initial={{ scale: 0, rotate: -20 }}
-                    animate={{ scale: 1, rotate: 12 }}
-                    className="absolute top-8 right-8 landscape:top-4 landscape:right-4 bg-[#bc13fe] text-white px-3 py-1.5 landscape:px-2 landscape:py-0.5 rounded-xl font-black text-xs landscape:text-[10px] shadow-[0_0_20px_rgba(188,19,254,0.5)] border border-white/20 z-20"
+                    animate={{ scale: 1, rotate: 8 }}
+                    exit={{ scale: 0 }}
+                    className="absolute -top-2 right-1/2 translate-x-1/2 landscape:translate-x-0 landscape:right-4 landscape:top-2 bg-gradient-to-r from-[#bc13fe] to-pink-500 text-white px-3 py-1 landscape:px-2 landscape:py-0.5 rounded-full font-black text-[10px] landscape:text-[9px] shadow-[0_0_20px_rgba(188,19,254,0.6)] border border-white/30 z-20"
                   >
-                    COMBO X{combo}
+                    COMBO ×{combo}
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div className="text-center mb-4 md:mb-6 landscape:mb-3">
-                <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.5em] mb-2 landscape:mb-1 opacity-40 italic underline decoration-cyan-400/30 underline-offset-4 landscape:hidden">Desafio de Processamento</div>
-                <h2 className="text-4xl md:text-6xl landscape:text-3xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+              {/* Question text */}
+              <div className="relative text-center my-4 md:my-6 landscape:my-2">
+                <h2 className="text-4xl md:text-5xl landscape:text-3xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_20px_rgba(0,242,255,0.3)] leading-tight">
                   {currentQuestion.text}
                 </h2>
-              </div>
-
-              {/* Options */}
-              <div className="grid grid-cols-2 gap-2 md:gap-3 landscape:gap-2">
-                {deduplicateItems(currentQuestion?.options || [], (opt) => `option-${currentQuestion?.id}-${opt}`, 'QuestionOptions').map((opt) => (
-                  <button
-                    key={`option-${currentQuestion?.id}-${opt}`}
-                    onClick={() => !feedback && handleAnswer(opt)}
-                    disabled={!!feedback}
-                    className={`game-btn py-3 md:py-5 landscape:py-2 text-lg md:text-2xl landscape:text-base font-black tabular-nums transition-all ${
-                      feedback === 'correct' && opt === currentQuestion?.answer ? 'bg-green-500 border-green-400 text-white scale-105 shadow-[0_0_30px_rgba(34,197,94,0.5)]' :
-                      feedback === 'wrong' && opt === selectedOption ? 'bg-red-500 border-red-500 text-white animate-shake shadow-[0_0_30px_rgba(239,68,68,0.5)]' :
-                      'bg-black/60 border-white/10 text-white/80 hover:bg-white/10 hover:border-white/30'
+                {currentQuestion.explanation && feedback && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mt-2 text-[10px] landscape:text-[9px] font-bold uppercase tracking-wider ${
+                      feedback === 'correct' ? 'text-green-400' : 'text-red-400'
                     }`}
                   >
-                    {opt}
-                  </button>
-                ))}
+                    {currentQuestion.explanation}
+                  </motion.p>
+                )}
               </div>
 
-              {/* Scanline Effect in Modal */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
+              {/* Options grid - 2x2 (1 col on landscape) */}
+              <div className="relative grid grid-cols-2 landscape:grid-cols-4 gap-2 md:gap-3 landscape:gap-1.5">
+                {deduplicateItems(currentQuestion?.options || [], (opt) => `option-${currentQuestion?.id}-${opt}`, 'QuestionOptions').map((opt, i) => {
+                  const isCorrect = feedback === 'correct' && opt === currentQuestion?.answer;
+                  const isWrong = feedback === 'wrong' && opt === selectedOption;
+                  return (
+                    <motion.button
+                      key={`option-${currentQuestion?.id}-${opt}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      onClick={() => !feedback && handleAnswer(opt)}
+                      disabled={!!feedback}
+                      className={`relative py-4 md:py-5 landscape:py-2.5 text-lg md:text-2xl landscape:text-base font-black tabular-nums rounded-xl landscape:rounded-lg border-2 transition-all overflow-hidden ${
+                        isCorrect
+                          ? 'bg-green-500 border-green-400 text-white scale-[1.03] shadow-[0_0_30px_rgba(34,197,94,0.6)]'
+                          : isWrong
+                          ? 'bg-red-500 border-red-400 text-white shadow-[0_0_30px_rgba(239,68,68,0.6)]'
+                          : feedback && opt === currentQuestion?.answer
+                          ? 'bg-green-500/20 border-green-500/50 text-green-300'
+                          : 'bg-white/[0.04] border-white/10 text-white hover:bg-white/10 hover:border-cyan-400/50 hover:scale-[1.02]'
+                      }`}
+                    >
+                      {isCorrect && <CheckCircle2 className="absolute top-1 right-1 w-3 h-3 text-white" />}
+                      {isWrong && <X className="absolute top-1 right-1 w-3 h-3 text-white" />}
+                      <span className="relative">{opt}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* Subtle scanline */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.06]">
                 <div className="w-full h-full" style={{
                   backgroundImage: 'repeating-linear-gradient(0deg, #000 0px, #000 2px, transparent 2px, transparent 4px)',
                   backgroundSize: '100% 4px'
