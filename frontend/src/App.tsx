@@ -3703,7 +3703,7 @@ export default function App() {
                     TRYHARD<br/>
                     <span className="text-[#bc13fe] drop-shadow-[0_0_35px_rgba(188,19,254,0.5)]">ACADEMY</span>
                   </h1>
-                  <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.45em] mt-3 pl-1">Arena Matemática de Combate</p>
+                  <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.45em] mt-3 pl-1">Arena do Conhecimento</p>
                 </motion.div>
 
                 {/* Steam List Menu */}
@@ -4271,7 +4271,7 @@ export default function App() {
                     <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
                       <h3 className="text-xl font-bold text-white mb-4">Bem-vindo à Tryhard Academy!</h3>
                       <p className="text-zinc-400 leading-relaxed">
-                        Prepare-se para uma experiência intensa onde matemática e reflexos se encontram. 
+                        Prepare-se para uma experiência intensa onde conhecimento e reflexos se encontram. 
                         Vamos te ensinar o básico para você dominar a arena.
                       </p>
                     </motion.div>
