@@ -24,8 +24,8 @@ class AudioManager {
     private initialized: boolean = false;
 
     private playlist: string[] = [
-        'https://image2url.com/r2/default/audio/1775610117548-903bdd15-f2f9-41fe-b533-c8ed3fe24f9a.mp3',
-        'https://image2url.com/r2/default/audio/1775610150368-03a915af-cb07-46b2-b6ad-9469eb700dac.mp3'
+        'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/audio/oedipus_wizball_highscore.mp3',
+        'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/audio/bodenstaendig_2000_in_rock_4bit.mp3'
     ];
     private currentTrackIndex: number = 0;
 

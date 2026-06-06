@@ -43,7 +43,7 @@ const initAudioCtx = () => {
     }
 };
 
-const playSyntheticSound = (type: 'shoot' | 'hit') => {
+const playSyntheticSound = (type: 'shoot' | 'hit' | 'correct' | 'wrong' | 'powerup') => {
     initAudioCtx();
     if (!audioCtx) return;
     
@@ -57,7 +57,7 @@ const playSyntheticSound = (type: 'shoot' | 'hit') => {
         osc.type = 'square';
         osc.frequency.setValueAtTime(880, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); // Louder
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.1);
@@ -65,10 +65,35 @@ const playSyntheticSound = (type: 'shoot' | 'hit') => {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(150, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
-        gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); // Louder
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.15);
+    } else if (type === 'correct') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    } else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(55, audioCtx.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    } else if (type === 'powerup') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(880, audioCtx.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
     }
 };
 
@@ -76,9 +101,9 @@ const playSyntheticSound = (type: 'shoot' | 'hit') => {
 const triggerGameSfx = (name: keyof typeof GAME_SFX_CONFIG, vol = 0.35) => {
     if (audioManager.getMuted()) return;
     
-    // Usa sons sintéticos garantidos para tiro e acerto (bypassa bloqueio de .ogg do iOS)
-    if (name === 'shoot' || name === 'hit') {
-        playSyntheticSound(name);
+    // Usa sons sintéticos garantidos para contornar problemas de compatibilidade e CORS
+    if (['shoot', 'hit', 'correct', 'wrong', 'powerup'].includes(name)) {
+        playSyntheticSound(name as any);
         return;
     }
 
@@ -2731,8 +2756,8 @@ export class Game {
             // Bot spawning (Offline only)
             if (!this.isMultiplayer && this.gameState === 'playing') {
                 // Level 1: 3, Level 2: 5, Level 3: 8, etc.
-                const maxBots = Math.min(60, Math.floor(3 + (this.level - 1) * 1.5));
-                const spawnRate = 0.02 + (this.level * 0.002);
+                const maxBots = 6 + Math.floor(this.level * 1.5);
+                const spawnRate = 0.05 + (this.level * 0.005);
                 
                 // If no bots left, spawn one immediately
                 if (this.bots.length === 0 || (this.bots.length < maxBots && Math.random() < spawnRate)) {
