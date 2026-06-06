@@ -126,7 +126,7 @@ app.post('/api/checkout', async (req, res) => {
     
     // Como a integração exata depende do ID do seu produto criado lá no painel,
     // aqui nós retornamos a URL simulada ou você pode preencher o ID da sua oferta abaixo.
-    const checkoutBaseUrl = 'https://pay.cakto.com.br/COLOQUE_AQUI_O_ID_DA_SUA_OFERTA';
+    const checkoutBaseUrl = 'https://pay.cakto.com.br/u5h6im8_850195';
     
     // Adicionamos o e-mail e UID na URL para rastrear quem comprou via Webhook depois!
     const checkoutUrl = `${checkoutBaseUrl}?email=${encodeURIComponent(email || '')}&src=${uid}`;
