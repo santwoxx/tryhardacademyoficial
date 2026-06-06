@@ -3601,7 +3601,7 @@ export default function App() {
             >
               <div className="text-center mb-8">
                 <img 
-                  src="https://i.ibb.co/Lzc34Y2G/a9baf465-f1bb-4dca-960a-b0e057f3565a.png" 
+                  src="https://i.ibb.co/d0hdJ7xN/Chat-GPT-Image-6-de-jun-de-2026-13-05-06.png" 
                   alt="Tryhard Academy Logo" 
                   className="w-24 h-24 mx-auto mb-4 object-contain drop-shadow-[0_0_15px_rgba(188,19,254,0.4)]"
                   referrerPolicy="no-referrer"
