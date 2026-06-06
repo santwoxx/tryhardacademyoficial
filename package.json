@@ -1,0 +1,11 @@
+{
+  "name": "tryhard-academy-monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "build": "npm run build --prefix frontend"
+  }
+}
