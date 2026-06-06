@@ -195,40 +195,55 @@ export class ParticlePool {
 }
 
 export class Trail {
-    points: Point[] = [];
+    private ring: Float32Array;
+    private ringHead: number = 0;
+    private ringSize: number = 0;
     maxLength: number = 10;
     color: string = '#fff';
     width: number = 2;
 
     constructor(maxLength: number, color: string, width: number) {
-        this.maxLength = maxLength;
+        // Cap at 20 for perf; player trail goes from 80 to 20, projectiles stay at 10
+        this.maxLength = Math.min(Math.max(2, maxLength), 20);
+        this.ring = new Float32Array(this.maxLength * 2);
         this.color = color;
         this.width = width;
     }
 
     update(x: number, y: number) {
-        this.points.unshift({ x, y });
-        if (this.points.length > this.maxLength) {
-            this.points.pop();
-        }
+        this.ring[this.ringHead * 2] = x;
+        this.ring[this.ringHead * 2 + 1] = y;
+        this.ringHead = (this.ringHead + 1) % this.maxLength;
+        if (this.ringSize < this.maxLength) this.ringSize++;
+    }
+
+    reset() {
+        this.ringHead = 0;
+        this.ringSize = 0;
     }
 
     draw(ctx: CanvasRenderingContext2D, quality: GraphicQuality) {
-        if (this.points.length < 2 || quality === 'low') return;
+        if (this.ringSize < 2 || quality === 'low') return;
 
         ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        
         ctx.beginPath();
         ctx.strokeStyle = this.color;
         ctx.lineWidth = this.width;
         ctx.globalAlpha = 0.3;
-        
-        ctx.moveTo(this.points[0].x, this.points[0].y);
-        for (let i = 1; i < this.points.length; i++) {
-            ctx.lineTo(this.points[i].x, this.points[i].y);
+
+        // Oldest point first: head points to where next write goes
+        const start = (this.ringHead - this.ringSize + this.maxLength) % this.maxLength;
+        const head = this.ringHead;
+        let idx = start;
+        ctx.moveTo(this.ring[idx * 2], this.ring[idx * 2 + 1]);
+        idx = (idx + 1) % this.maxLength;
+        while (idx !== head) {
+            ctx.lineTo(this.ring[idx * 2], this.ring[idx * 2 + 1]);
+            idx = (idx + 1) % this.maxLength;
         }
+        ctx.lineTo(this.ring[head * 2], this.ring[head * 2 + 1]);
         ctx.stroke();
         ctx.restore();
     }

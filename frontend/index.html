@@ -10,6 +10,14 @@
     <meta name="keywords" content="jogo educativo, matemática, ciências, história, português, multiplayer, arena, io game, browser game, tryhard academy, jogo de conhecimento" />
     <meta name="theme-color" content="#bc13fe" />
     
+    <!-- Preconnect to critical third-party origins (DNS+TLS warm-up while JS parses) -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://i.ibb.co" crossorigin />
+    <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.pixabay.com" />
+    <link rel="dns-prefetch" href="https://image2url.com" />
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="TryHard Academy - A Arena do Conhecimento" />
@@ -25,10 +33,16 @@
     <link rel="icon" type="image/png" href="https://i.ibb.co/d0hdJ7xN/Chat-GPT-Image-6-de-jun-de-2026-13-05-06.png" />
     <link rel="apple-touch-icon" href="https://i.ibb.co/d0hdJ7xN/Chat-GPT-Image-6-de-jun-de-2026-13-05-06.png" />
     <title>TryHard Academy - A Arena do Conhecimento</title>
+    
+    <style>
+      /* Critical inline CSS - paints dark background before JS loads (avoids white flash) */
+      html, body { margin: 0; padding: 0; background: #050505; color: #fff; overscroll-behavior: none; }
+      body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
+      #root { min-height: 100vh; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

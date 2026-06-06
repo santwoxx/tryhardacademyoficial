@@ -6,113 +6,22 @@
 import { ParticlePool, Trail, ScreenShake, Lighting, FlashEffect, Shockwave, HitMarker } from './effects';
 import { audioManager } from './audio';
 
-/**
- * NATIVE SFX UTILITY
- * Minimal, high-performance sound management inside engine.ts
- */
-const GAME_SFX_CONFIG = {
-    shoot: 'https://actions.google.com/sounds/v1/science_fiction/laser_pew.ogg',
-    collect: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
-    hit: 'https://actions.google.com/sounds/v1/weapons/bullet_impact_wood.ogg',
-    explosion: 'https://actions.google.com/sounds/v1/weapons/explosion_distant.ogg',
-    level_up: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
-    powerup: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg'
-};
-
-const SFX_POOLS: Record<string, HTMLAudioElement[]> = {};
-
-// Initialization: Preload sounds into pools to prevent latency
-Object.entries(GAME_SFX_CONFIG).forEach(([key, url]) => {
-    // Increased pool size for rapid sounds like shoot and hit
-    const poolSize = (key === 'shoot' || key === 'hit') ? 12 : 6;
-    SFX_POOLS[key] = Array.from({ length: poolSize }, () => {
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        return audio;
-    });
-});
-
-// Audio Context para sons sintéticos (compatível com todos os navegadores móveis e iOS)
-let audioCtx: AudioContext | null = null;
-const initAudioCtx = () => {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-};
-
-const playSyntheticSound = (type: 'shoot' | 'hit' | 'correct' | 'wrong' | 'powerup') => {
-    initAudioCtx();
-    if (!audioCtx) return;
-    
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    if (type === 'shoot') {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); // Louder
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
-    } else if (type === 'hit') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
-        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); // Louder
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-    } else if (type === 'correct') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-        osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
-        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.4);
-    } else if (type === 'wrong') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(110, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(55, audioCtx.currentTime + 0.3);
-        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.3);
-    } else if (type === 'powerup') {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(880, audioCtx.currentTime + 0.3);
-        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.3);
-    }
-};
-
-/** Plays a sound effect from the pool with volume control */
-const triggerGameSfx = (name: keyof typeof GAME_SFX_CONFIG, vol = 0.35) => {
+// All in-game SFX are synthesized via the AudioManager - no external URLs, no preload, no CORS.
+// This avoids 23+ <Audio> elements and 6 network requests at startup.
+const triggerGameSfx = (name: 'shoot' | 'hit' | 'correct' | 'wrong' | 'powerup' | 'collect' | 'explosion' | 'level_up', vol = 0.35) => {
     if (audioManager.getMuted()) return;
-    
-    // Usa sons sintéticos garantidos para contornar problemas de compatibilidade e CORS
-    if (['shoot', 'hit', 'correct', 'wrong', 'powerup'].includes(name)) {
-        playSyntheticSound(name as any);
-        return;
-    }
-
-    const pool = SFX_POOLS[name];
-    if (!pool) return;
-    const sound = pool.find(s => s.paused || s.ended) || pool[0];
-    sound.currentTime = 0; // Reset for rapid-fire sounds
-    sound.volume = vol;
-    sound.play().catch(() => {});
+    // Map engine-internal names to AudioManager's SoundEffect union
+    const map: Record<string, any> = {
+        shoot: 'shoot',
+        hit: 'hit',
+        correct: 'correct',
+        wrong: 'wrong',
+        powerup: 'powerup',
+        collect: 'correct',
+        explosion: 'explosion',
+        level_up: 'level_up'
+    };
+    audioManager.playSound(map[name] || name);
 };
 
 export interface Point {
@@ -221,7 +130,7 @@ export class Projectile {
         this.ownerId = ownerId;
         this.active = true;
         this.trail.color = this.color;
-        this.trail.points = []; // Reset trail
+        this.trail.reset();
     }
 
     update(bounds: { width: number, height: number }, dt: number) {
@@ -2110,8 +2019,11 @@ export class Game {
     }
 
     private initUltraEffects() {
+        // Mobile gets ~30% of the desktop entity counts to save iteration cost
+        const starCount = this.isMobile ? 80 : 300;
+        const dustCount = this.isMobile ? 25 : 100;
         this.parallaxStars = [];
-        for (let i = 0; i < 300; i++) {
+        for (let i = 0; i < starCount; i++) {
             this.parallaxStars.push({
                 x: Math.random() * WORLD_WIDTH,
                 y: Math.random() * WORLD_HEIGHT,
@@ -2122,7 +2034,7 @@ export class Game {
         }
         
         this.spaceDust = [];
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < dustCount; i++) {
             this.spaceDust.push({
                 x: Math.random() * WORLD_WIDTH,
                 y: Math.random() * WORLD_HEIGHT,
@@ -2282,8 +2194,8 @@ export class Game {
             h: this.canvas.height / this.cameraScale
         };
 
-        // Deep Space Nebula (High Quality)
-        if (this.quality === 'high' && !this.performanceMode) {
+        // Deep Space Nebula (High Quality desktop only - heavy radial gradients)
+        if (this.quality === 'high' && !this.performanceMode && !this.isMobile) {
             const time = Date.now() / 10000;
             this.ctx.save();
             
@@ -2349,10 +2261,13 @@ export class Game {
         }
         
         this.ctx.restore();
-        this.drawSpaceDust(viewport);
+        // Space dust is heavy (100 entities iterated + culled per frame) - mobile skips
+        if (!this.isMobile && this.quality === 'high' && !this.performanceMode) {
+            this.drawSpaceDust(viewport);
+        }
 
-        // Level-specific background patterns
-        if (this.level > 10 && !this.performanceMode) {
+        // Level-specific background patterns (desktop only - mobile has enough going on)
+        if (this.level > 10 && !this.performanceMode && !this.isMobile) {
             const time = Date.now() / 1000;
             this.ctx.save();
             this.ctx.globalAlpha = 0.05;
@@ -2655,14 +2570,19 @@ export class Game {
             return;
         }
 
-        this.updateQualityScaling(dt);
+        // Only do quality scaling during active gameplay
+        if (this.gameState === 'playing') {
+            this.updateQualityScaling(dt);
+        }
         
-        // Performance: Clear and Populate Spatial Grid ONCE per frame before substeps
-        this.clearSpatialGrid();
-        this.populateSpatialGrid();
+        // Performance: Clear and Populate Spatial Grid only when needed
+        if (this.gameState === 'playing') {
+            this.clearSpatialGrid();
+            this.populateSpatialGrid();
+        }
         
-        // Sub-stepping for physics stability - optimized for mobile performance
-        const substeps = this.isMobile ? 2 : 2; // Reduced from 4 to 2 on mobile for significant CPU savings
+        // Sub-stepping for physics stability - mobile runs 1 substep for big CPU savings
+        const substeps = this.isMobile ? 1 : 2;
         const subDt = dt / substeps;
 
         for (let step = 0; step < substeps; step++) {
@@ -2900,16 +2820,36 @@ export class Game {
         // Performance: Optimized Spatial Collisions
         this.checkSpatialCollisions(dt);
 
-        // Cleanup (Optimized to avoid frequent allocations)
-        if (!this.isMultiplayer && time % 500 < 20) { // Only cleanup every ~0.5s
-            this.stars = this.stars.filter(s => !s.isDead);
-            this.bots = this.bots.filter(b => !b.isDead);
+        // Cleanup using swap-remove (no array allocation, in-place compaction)
+        if (!this.isMultiplayer && time % 500 < 20) { // Every ~0.5s
+            this.compactStarsAndBots();
         }
         
         // Leveling System Check
         if (!this.isMultiplayer && this.kills >= this.killsToNextLevel) {
             this.prepareNextLevel();
         }
+    }
+
+    private compactStarsAndBots() {
+        // In-place compaction using swap-remove to avoid GC pressure
+        let w = 0;
+        for (let r = 0; r < this.stars.length; r++) {
+            if (!this.stars[r].isDead) {
+                if (w !== r) this.stars[w] = this.stars[r];
+                w++;
+            }
+        }
+        this.stars.length = w;
+
+        w = 0;
+        for (let r = 0; r < this.bots.length; r++) {
+            if (!this.bots[r].isDead) {
+                if (w !== r) this.bots[w] = this.bots[r];
+                w++;
+            }
+        }
+        this.bots.length = w;
     }
 
     private checkSpatialCollisions(dt: number) {
@@ -2977,27 +2917,10 @@ export class Game {
             }
         }
 
-        // Star collisions (keep simple as they are few or use grid if many)
-        this.stars.forEach(star => {
-            if (star.isDead) return;
-            star.update();
-            const dx = playerX - star.pos.x;
-            const dy = playerY - star.pos.y;
-            const distSq = dx * dx + dy * dy;
-            const minDist = (playerR + star.radius) * (this.isMobile ? 1.25 : 1.15);
-            if (distSq < minDist * minDist) {
-                star.isDead = true;
-                this.spawnParticles(star.pos.x, star.pos.y, star.color, 45, 6);
-                this.shake.shake(6);
-                this.flash.trigger(0.2, star.color);
-                this.pool.spawnAbsorption(playerX, playerY, star.pos.x, star.pos.y, star.color, 15);
-                triggerGameSfx('collect');
-                if (this.onStarCollected) this.onStarCollected(this.stars.indexOf(star));
-                if (this.isMultiplayer && this.onStarUpdate) {
-                    this.onStarUpdate(this.stars.map(s => ({ x: s.pos.x, y: s.pos.y, active: !s.isDead })));
-                }
-            }
-        });
+        // Stars' pulse animation (consolidated - was a duplicate collision block)
+        for (let i = 0; i < this.stars.length; i++) {
+            if (!this.stars[i].isDead) this.stars[i].update();
+        }
     }
 
     private handleProjectileHit(p: Projectile, entity: Player | Bot, dt: number) {
@@ -3209,33 +3132,66 @@ export class Game {
         this.ctx.restore();
     }
 
-    private drawPostProcessing() {
-        if (this.quality === 'low' || this.performanceMode) return;
+    // Cached vignette + scanline overlay - rebuilt only when size changes
+    private vignetteCache: HTMLCanvasElement | null = null;
+    private vignetteCacheKey: string = '';
+    private scanlineCache: HTMLCanvasElement | null = null;
+    private scanlineCacheKey: string = '';
+
+    private getVignetteCache(): HTMLCanvasElement {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const key = `${w}x${h}`;
+        if (this.vignetteCache && this.vignetteCacheKey === key) return this.vignetteCache;
         
-        // Vignette - Stronger and more cinematic
-        const grad = this.ctx.createRadialGradient(
-            this.canvas.width / 2, this.canvas.height / 2, 0,
-            this.canvas.width / 2, this.canvas.height / 2, Math.max(this.canvas.width, this.canvas.height) * 0.9
-        );
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const cx = c.getContext('2d')!;
+        const grad = cx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.9);
         grad.addColorStop(0, 'transparent');
         grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)');
         grad.addColorStop(1, 'rgba(0, 0, 0, 0.7)');
-        this.ctx.fillStyle = grad;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // CRT Scanlines - Optimized for mobile by reducing draw call count
-        const scanlineOpacity = this.quality === 'high' ? 0.08 : 0.04;
-        const step = this.isMobile ? 6 : 3;
-        this.ctx.save();
-        this.ctx.globalAlpha = scanlineOpacity;
-        this.ctx.fillStyle = '#000';
-        for (let i = 0; i < this.canvas.height; i += step) {
-            this.ctx.fillRect(0, i, this.canvas.width, 1);
-        }
-        this.ctx.restore();
+        cx.fillStyle = grad;
+        cx.fillRect(0, 0, w, h);
+        this.vignetteCache = c;
+        this.vignetteCacheKey = key;
+        return c;
+    }
 
-        // Subtle RGB Split / Chromatic Aberration in High Quality
-        if (this.quality === 'high') {
+    private getScanlineCache(step: number, opacity: number): HTMLCanvasElement {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const key = `${w}x${h}_${step}_${opacity}`;
+        if (this.scanlineCache && this.scanlineCacheKey === key) return this.scanlineCache;
+        
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const cx = c.getContext('2d')!;
+        cx.globalAlpha = opacity;
+        cx.fillStyle = '#000';
+        for (let y = 0; y < h; y += step) {
+            cx.fillRect(0, y, w, 1);
+        }
+        this.scanlineCache = c;
+        this.scanlineCacheKey = key;
+        return c;
+    }
+
+    private drawPostProcessing() {
+        if (this.quality === 'low' || this.performanceMode) return;
+        
+        // Vignette - cached, drawn as single image instead of creating radial gradient every frame
+        this.ctx.drawImage(this.getVignetteCache(), 0, 0);
+        
+        // CRT Scanlines - cached, single drawImage replaces hundreds of fillRect calls
+        const step = this.isMobile ? 6 : 3;
+        const scanlineOpacity = this.quality === 'high' ? 0.08 : 0.04;
+        this.ctx.drawImage(this.getScanlineCache(step, scanlineOpacity), 0, 0);
+
+        // Subtle RGB Split / Chromatic Aberration - desktop only (mobile skips)
+        if (this.quality === 'high' && !this.isMobile) {
             this.ctx.save();
             this.ctx.globalCompositeOperation = 'screen';
             this.ctx.globalAlpha = 0.1;
@@ -3397,10 +3353,16 @@ export class Game {
             this.accumulator += dt;
             
             // Fixed timestep integration for deterministic/smooth physics
-            while (this.accumulator >= this.fixedDt) {
+            // Cap iterations to prevent spiral-of-death on slow frames
+            let iter = 0;
+            const maxIter = this.isMobile ? 3 : 5;
+            while (this.accumulator >= this.fixedDt && iter < maxIter) {
                 this.update(this.fixedDt, time);
                 this.accumulator -= this.fixedDt;
+                iter++;
             }
+            // Drop residual time if we hit the cap (avoids catch-up spiral)
+            if (iter >= maxIter) this.accumulator = 0;
         }
 
         this.draw();

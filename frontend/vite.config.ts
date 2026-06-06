@@ -8,12 +8,45 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     base: './',
+    build: {
+      target: 'es2019',
+      cssCodeSplit: true,
+      sourcemap: false,
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          passes: 2,
+          drop_console: false,
+          drop_debugger: true
+        }
+      },
+      rollupOptions: {
+        output: {
+          // Split heavy vendors so the main bundle stays small (faster TTI on mobile)
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/database', 'firebase/firestore'],
+            'vendor-motion': ['framer-motion', 'motion'],
+            'vendor-icons': ['lucide-react'],
+            'vendor-capacitor': [
+              '@capacitor/core',
+              '@capacitor/app',
+              '@capacitor/haptics',
+              '@capacitor/network',
+              '@capacitor/browser',
+              '@capacitor-community/admob'
+            ]
+          }
+        }
+      },
+      chunkSizeWarningLimit: 800
+    },
     plugins: [
       react(), 
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'audio/*.mp3'],
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'TryHard Academy',
           short_name: 'TryHard',
@@ -33,8 +66,8 @@ export default defineConfig(({mode}) => {
           ]
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,mp3}'],
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           cleanupOutdatedCaches: true,
           skipWaiting: true,
           clientsClaim: true,
@@ -46,12 +79,12 @@ export default defineConfig(({mode}) => {
                 cacheName: 'external-images',
                 expiration: {
                   maxEntries: 200,
-                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                  maxAgeSeconds: 60 * 60 * 24 * 30
                 },
                 cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
+                  statuses: [0, 200]
+                }
+              }
             },
             {
               urlPattern: /^https:\/\/cdn\.pixabay\.com\/.*/i,
@@ -60,12 +93,12 @@ export default defineConfig(({mode}) => {
                 cacheName: 'pixabay-audio',
                 expiration: {
                   maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                  maxAgeSeconds: 60 * 60 * 24 * 30
                 },
                 cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
+                  statuses: [0, 200]
+                }
+              }
             },
             {
               urlPattern: /^https:\/\/image2url\.com\/.*/i,
@@ -74,10 +107,25 @@ export default defineConfig(({mode}) => {
                 cacheName: 'game-audio',
                 expiration: {
                   maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                  maxAgeSeconds: 60 * 60 * 24 * 30
                 },
                 cacheableResponse: {
-                  statuses: [0, 200],
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              // Cache BGM tracks so the menu music works offline after first load
+              urlPattern: /^https:\/\/raw\.githubusercontent\.com\/phaser3-examples\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'bgm-tracks',
+                expiration: {
+                  maxEntries: 4,
+                  maxAgeSeconds: 60 * 60 * 24 * 30
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
                 }
               }
             }
@@ -86,17 +134,15 @@ export default defineConfig(({mode}) => {
       })
     ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
+        '@': path.resolve(__dirname, '.')
+      }
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâ€”file watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-    },
+      hmr: process.env.DISABLE_HMR !== 'true'
+    }
   };
 });

@@ -1,6 +1,6 @@
 /**
  * TRYHARD ACADEMY - Audio System
- * Handles Background Music and Sound Effects
+ * Background Music + Synthetic Sound Effects (no external downloads)
  */
 
 export type SoundEffect = 
@@ -17,12 +17,14 @@ export type SoundEffect =
 class AudioManager {
     private static instance: AudioManager;
     private bgm: HTMLAudioElement | null = null;
-    private sounds: Map<SoundEffect, HTMLAudioElement[]> = new Map();
     private isMuted: boolean = false;
     private volume: number = 0.3;
-    private sfxVolume: number = 0.4;
     private initialized: boolean = false;
 
+    // Synthetic audio context for all SFX (no external files = no network, no CORS, no latency)
+    private audioCtx: AudioContext | null = null;
+
+    // BGM playlist is small and user-gesture-activated (avoids autoplay blocks)
     private playlist: string[] = [
         'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/audio/oedipus_wizball_highscore.mp3',
         'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/audio/bodenstaendig_2000_in_rock_4bit.mp3'
@@ -40,41 +42,28 @@ class AudioManager {
         return AudioManager.instance;
     }
 
-    private soundUrls: Record<SoundEffect, string> = {
-        shoot: 'https://actions.google.com/sounds/v1/science_fiction/laser_pew.ogg',
-        explosion: 'https://actions.google.com/sounds/v1/weapons/explosion_distant.ogg',
-        hit: 'https://actions.google.com/sounds/v1/weapons/bullet_impact_wood.ogg',
-        powerup: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
-        level_up: 'https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg',
-        victory: 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg',
-        death: 'https://actions.google.com/sounds/v1/cartoon/cartoon_cowbell.ogg',
-        correct: 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg',
-        wrong: 'https://actions.google.com/sounds/v1/cartoon/cartoon_cowbell.ogg'
-    };
+    private ensureCtx(): AudioContext | null {
+        if (this.isMuted) return null;
+        if (!this.audioCtx) {
+            try {
+                this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            } catch (e) {
+                return null;
+            }
+        }
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume().catch(() => {});
+        }
+        return this.audioCtx;
+    }
 
     init() {
         if (this.initialized) return;
         this.initialized = true;
-
-        // Pre-load common sounds (pool of 5 for each to allow overlapping)
-        const effects: SoundEffect[] = [
-            'shoot', 'explosion', 'hit', 'powerup', 
-            'level_up', 'victory', 'death', 'correct', 'wrong'
-        ];
-
-        effects.forEach(effect => {
-            const pool: HTMLAudioElement[] = [];
-            for (let i = 0; i < 5; i++) {
-                const audio = new Audio();
-                audio.src = this.soundUrls[effect];
-                audio.preload = 'auto';
-                pool.push(audio);
-            }
-            this.sounds.set(effect, pool);
-        });
     }
 
     playBGM() {
+        if (this.isMuted) return;
         const src = this.playlist[this.currentTrackIndex];
         
         if (!this.bgm) {
@@ -94,60 +83,92 @@ class AudioManager {
 
         this.bgm.pause();
         this.bgm.src = src;
-        this.bgm.loop = false; // We handle looping manually via 'ended' event
+        this.bgm.loop = false;
         this.bgm.volume = this.volume;
         this.bgm.muted = this.isMuted;
         
         this.bgm.play().catch(() => {
-            // Handle autoplay policy
+            // Handle autoplay policy - retry on first user interaction
             const unlock = () => {
                 this.bgm?.play().catch(() => {});
                 window.removeEventListener('click', unlock);
                 window.removeEventListener('keydown', unlock);
+                window.removeEventListener('touchstart', unlock);
             };
-            window.addEventListener('click', unlock);
-            window.addEventListener('keydown', unlock);
+            window.addEventListener('click', unlock, { once: true });
+            window.addEventListener('keydown', unlock, { once: true });
+            window.addEventListener('touchstart', unlock, { once: true });
         });
     }
 
     playSound(effect: SoundEffect) {
         if (this.isMuted) return;
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
 
-        const pool = this.sounds.get(effect);
-        if (!pool || pool.length === 0) {
-            // Lazy load if not initialized for some reason
-            this.init();
-            return;
-        }
+        const t = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
 
-        // Find an available audio element in the pool
-        // Optimization: pick the first one that is paused or has ended
-        const audio = pool.find(a => a.paused || a.ended) || pool[0];
-        
-        try {
-            audio.currentTime = 0;
-            audio.volume = this.sfxVolume;
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    // console.log("Audio play blocked", error);
-                });
-            }
-        } catch (e) {
-            // console.warn("Audio playback error", e);
+        // Compact synthesizer: each effect = one oscillator with envelope
+        switch (effect) {
+            case 'shoot':
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(880, t);
+                osc.frequency.exponentialRampToValueAtTime(110, t + 0.1);
+                gain.gain.setValueAtTime(0.12, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                osc.start(t); osc.stop(t + 0.1);
+                break;
+            case 'hit':
+            case 'explosion':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+                gain.gain.setValueAtTime(0.13, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+                osc.start(t); osc.stop(t + 0.15);
+                break;
+            case 'powerup':
+            case 'level_up':
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, t);
+                osc.frequency.linearRampToValueAtTime(880, t + 0.3);
+                gain.gain.setValueAtTime(0.12, t);
+                gain.gain.linearRampToValueAtTime(0.001, t + 0.3);
+                osc.start(t); osc.stop(t + 0.3);
+                break;
+            case 'correct':
+            case 'victory':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523, t);
+                osc.frequency.setValueAtTime(659, t + 0.1);
+                osc.frequency.setValueAtTime(784, t + 0.2);
+                gain.gain.setValueAtTime(0.15, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+                osc.start(t); osc.stop(t + 0.4);
+                break;
+            case 'wrong':
+            case 'death':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, t);
+                osc.frequency.exponentialRampToValueAtTime(55, t + 0.3);
+                gain.gain.setValueAtTime(0.15, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                osc.start(t); osc.stop(t + 0.3);
+                break;
         }
     }
 
     pauseAll() {
         if (this.bgm) this.bgm.pause();
-        this.sounds.forEach(pool => {
-            pool.forEach(audio => {
-                if (!audio.paused) audio.pause();
-            });
-        });
+        if (this.audioCtx) this.audioCtx.suspend().catch(() => {});
     }
 
     resumeAll() {
+        if (this.audioCtx) this.audioCtx.resume().catch(() => {});
         if (this.bgm && !this.isMuted) {
             this.bgm.play().catch(() => {});
         }
@@ -158,6 +179,11 @@ class AudioManager {
         localStorage.setItem('isMuted', String(muted));
         if (this.bgm) {
             this.bgm.muted = muted;
+        }
+        if (muted && this.audioCtx) {
+            this.audioCtx.suspend().catch(() => {});
+        } else if (this.audioCtx) {
+            this.audioCtx.resume().catch(() => {});
         }
     }
 
