@@ -27,10 +27,13 @@ import { QuestionEngine, Question } from './game/questionEngine';
 import { LoadingScreen } from './components/LoadingScreen';
 
 // Lazy loaded components for better performance
-const SkinStore = React.lazy(() => import('./components/SkinStore').then(m => ({ default: m.SkinStore })));
-const AdminDashboard = React.lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const GlobalChat = React.lazy(() => import('./components/GlobalChat').then(m => ({ default: m.GlobalChat })));
-const MiniMap = React.lazy(() => import('./components/MiniMap').then(m => ({ default: m.MiniMap })));
+// Usa lazyImport() em vez de React.lazy() direto para ganhar
+// retry automático + reload limpo em caso de chunk stale após deploy.
+import { lazyImport, forceCleanReload } from './lib/retryImport';
+const SkinStore = React.lazy(() => lazyImport(() => import('./components/SkinStore').then(m => ({ default: m.SkinStore }))));
+const AdminDashboard = React.lazy(() => lazyImport(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard }))));
+const GlobalChat = React.lazy(() => lazyImport(() => import('./components/GlobalChat').then(m => ({ default: m.GlobalChat }))));
+const MiniMap = React.lazy(() => lazyImport(() => import('./components/MiniMap').then(m => ({ default: m.MiniMap }))));
 
 import { 
   GoogleAuthProvider, 
@@ -124,18 +127,33 @@ function handleDatabaseError(error: unknown, operationType: OperationType, path:
   }));
 }
 
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: any }> {
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: any, chunkErrorDetected: boolean }> {
+  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(props: { children: ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, chunkErrorDetected: false };
   }
 
   static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
+    const msg = error?.message || String(error);
+    const isChunk = /Failed to fetch dynamically imported module|Loading chunk \d+ failed|Importing a module script failed|ChunkLoadError/i.test(msg);
+    return { hasError: true, error, chunkErrorDetected: isChunk };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error("ErrorBoundary caught an error", error, errorInfo);
+    // Se for erro de chunk, agenda reload automático em 800ms.
+    // O sessionStorage em forceCleanReload() garante no máximo 1 reload
+    // por sessão, evitando loop infinito.
+    if (this.state.chunkErrorDetected) {
+      this.reloadTimer = setTimeout(() => {
+        forceCleanReload();
+      }, 800);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.reloadTimer) clearTimeout(this.reloadTimer);
   }
 
   render() {
@@ -148,6 +166,33 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
         message = this.state.error?.message || message;
       }
 
+      // UI específica para chunk error: feedback visual + reload em background
+      if (this.state.chunkErrorDetected) {
+        return (
+          <div className="fixed inset-0 bg-[#050505] flex flex-col items-center justify-center z-[1000] p-6 text-center">
+            <div className="w-20 h-20 bg-cyan-500/10 rounded-full flex items-center justify-center mb-6 animate-spin border border-cyan-500/30">
+              <RotateCcw className="w-10 h-10 text-cyan-400" />
+            </div>
+            <h1 className="text-2xl font-black text-white mb-4 uppercase tracking-wider">Nova Versão Disponível</h1>
+            <p className="text-zinc-400 max-w-md mb-2 leading-relaxed">
+              Atualizamos a TryHard Academy com melhorias e correções.
+            </p>
+            <p className="text-cyan-400 text-sm mb-8 font-mono">
+              Sincronizando a versão mais recente...
+            </p>
+            <div className="flex flex-col gap-4 w-full max-w-xs">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-4 bg-cyan-500 text-black font-black rounded-xl hover:bg-cyan-400 transition-all flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-5 h-5" />
+                Atualizar Agora
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="fixed inset-0 bg-[#050505] flex flex-col items-center justify-center z-[1000] p-6 text-center">
           <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 animate-pulse border border-red-500/30">
@@ -156,14 +201,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
           <h1 className="text-2xl font-black text-white mb-4 uppercase tracking-wider">Sistema Interrompido</h1>
           <p className="text-zinc-400 max-w-md mb-8 leading-relaxed">{message}</p>
           <div className="flex flex-col gap-4 w-full max-w-xs">
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full py-4 bg-cyan-500 text-black font-black rounded-xl hover:bg-cyan-400 transition-all flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-5 h-5" />
               Reiniciar Aplicativo
             </button>
-            <button 
+            <button
               onClick={() => {
                 localStorage.clear();
                 sessionStorage.clear();

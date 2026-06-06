@@ -46,6 +46,8 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: 'auto',
+        strategies: 'generateSW',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'TryHard Academy',
@@ -71,7 +73,31 @@ export default defineConfig(({mode}) => {
           cleanupOutdatedCaches: true,
           skipWaiting: true,
           clientsClaim: true,
+          // Garante que o SW sempre peça a versão mais nova do index.html
+          // ao servidor antes de servir do cache. Isso impede que o
+          // navegador continue usando um HTML antigo que referencia chunks
+          // que já não existem no deploy novo.
+          navigateFallback: 'index.html',
+          navigateFallbackDenylist: [/^\/api/],
           runtimeCaching: [
+            {
+              // NetworkFirst para o HTML - prioriza servidor, cai no cache offline.
+              // É a peça-chave para evitar "Failed to fetch dynamically imported module"
+              // após deploy, porque o HTML sempre será a versão mais recente.
+              urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'html-cache',
+                networkTimeoutSeconds: 5,
+                expiration: {
+                  maxEntries: 16,
+                  maxAgeSeconds: 60 * 60 * 24
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
             {
               urlPattern: /^https:\/\/i\.ibb\.co\/.*/i,
               handler: 'CacheFirst',
