@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "Player": {
+      "title": "Player",
+      "description": "Represents a player in the game.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique ID of the player." },
+        "nickname": { "type": "string", "description": "Display name of the player." },
+        "trophies": { "type": "integer", "description": "Number of trophies earned." },
+        "level": { "type": "integer", "description": "Current player level." },
+        "selectedSkinId": { "type": "integer", "description": "ID of the currently selected skin." },
+        "pos": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "vel": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "lives": { "type": "integer" },
+        "ammo": { "type": "integer" },
+        "kills": { "type": "integer" },
+        "role": { "type": "string", "enum": ["admin", "teacher", "student", "player", "pending-teacher"], "description": "User role for permissions." },
+        "teacherId": { "type": "string", "description": "UID of the teacher if this is a student." },
+        "schoolName": { "type": "string", "description": "Name of the school/college." },
+        "lastUpdate": { "type": "integer", "description": "Timestamp of the last update." }
+      },
+      "required": ["uid", "nickname", "trophies"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Authorized emails for specific roles.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["teacher", "student"] },
+        "teacherId": { "type": "string", "description": "For student invitations." },
+        "schoolName": { "type": "string" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["email", "role"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Represents a competitive multiplayer game room (max 4 players).",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "mode": { "type": "string", "enum": ["ffa", "teams"] },
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
+        "players": {
+          "type": "object",
+          "description": "Map of player states keyed by UID.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "nickname": { "type": "string" },
+              "status": { "type": "string", "enum": ["alive", "dead", "spectator"] },
+              "team": { "type": "string", "enum": ["A", "B", "none"] },
+              "ready": { "type": "boolean" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["hostId", "mode", "status", "players"]
+    },
+    "Projectile": {
+      "title": "Projectile",
+      "description": "Represents a projectile in a multiplayer room.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "pos": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "vel": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["id", "roomId", "ownerId", "pos", "vel"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Represents a message in the global chat.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "uid": { "type": "string" },
+        "nickname": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "role": { "type": "string" }
+      },
+      "required": ["text", "uid", "nickname", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/players/{uid}": { "schema": "Player", "description": "Global player data." },
+    "/invitations/{email}": { "schema": "Invitation", "description": "Pre-authorized roles by email." },
+    "/rooms/{roomId}": { "schema": "Room", "description": "Active game rooms." },
+    "/rooms/{roomId}/projectiles/{projectileId}": { "schema": "Projectile", "description": "Projectiles in a specific room." },
+    "/global_chat/{messageId}": { "schema": "ChatMessage", "description": "Global community chat." }
+  }
+}

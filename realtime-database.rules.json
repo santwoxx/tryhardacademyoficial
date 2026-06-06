@@ -1,0 +1,54 @@
+{
+  "rules": {
+    "players": {
+      ".indexOn": ["trophies", "teacherId", "role"],
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('players/' + $uid + '/teacherId').val() === auth.uid || root.child('players/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'natanmarinhocanalyt@gmail.com')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('players/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'natanmarinhocanalyt@gmail.com')",
+        "trophies": { ".validate": "newData.isNumber()" },
+        "nickname": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "role": {
+          ".validate": "newData.isString() && (newData.val() == 'player' || newData.val() == 'teacher' || newData.val() == 'admin' || newData.val() == 'student' || newData.val() == 'pending-teacher')"
+        },
+        "teacherId": { ".validate": "newData.isString() || newData.val() === null" }
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === 'natanmarinhocanalyt@gmail.com')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('players/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'natanmarinhocanalyt@gmail.com')"
+      }
+    },
+    "rooms": {
+      ".indexOn": ["status"],
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$roomId": {
+        ".validate": "newData.hasChildren(['status'])"
+      }
+    },
+    "activationCodes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && data.exists() && data.child('used').val() === false",
+        "used": { ".validate": "newData.isBoolean()" },
+        "uid": { ".validate": "newData.val() === auth.uid" }
+      }
+    },
+    "premiumUsers": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === 'natanmarinhocanalyt@gmail.com')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'natanmarinhocanalyt@gmail.com')"
+      }
+    },
+    "invitations": {
+      ".indexOn": ["email", "teacherId", "role"],
+      ".read": "auth != null && (root.child('players/' + auth.uid + '/role').val() === 'admin' || root.child('players/' + auth.uid + '/role').val() === 'teacher' || auth.token.email === 'natanmarinhocanalyt@gmail.com')",
+      "$invitationId": {
+        ".read": "auth != null && (data.child('email').val() === auth.token.email || root.child('players/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'natanmarinhocanalyt@gmail.com')",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

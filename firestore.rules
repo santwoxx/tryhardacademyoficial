@@ -1,0 +1,179 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Funções Auxiliares
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerified() && request.auth.token.email == "natanmarinhocanalyt@gmail.com";
+    }
+
+    function isTeacher() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/players/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/players/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['text', 'uid', 'nickname', 'timestamp']) &&
+        data.text is string && data.text.size() > 0 && data.text.size() <= 200 &&
+        data.uid == request.auth.uid &&
+        data.nickname is string && data.nickname.size() >= 1 &&
+        data.timestamp == request.time;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // ===============================================================
+    // Chat Global
+    // ===============================================================
+
+    match /global_chat/{messageId} {
+      allow read, get, list: if isAuthenticated();
+
+      allow create: if isAuthenticated()
+        && isValidId(messageId)
+        && isValidChatMessage(incoming());
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Players (CRÍTICO - LEADERBOARD)
+    // ===============================================================
+
+    match /players {
+      // 🔥 ESSENCIAL PRA QUERY / ORDERBY / LEADERBOARD
+      allow list: if isAuthenticated();
+
+      match /{uid} {
+        // leitura individual
+        allow get: if isAuthenticated();
+
+        // criação segura
+        allow create: if isOwner(uid);
+
+        // update seguro (evita hack de role/admin)
+        allow update: if isOwner(uid) || isAdmin();
+
+        // 🔥 VALIDAÇÃO IMPORTANTE (ANTI-CHEAT BÁSICO)
+        allow update: if request.resource.data.role == resource.data.role || isAdmin();
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ===============================================================
+    // Invitations
+    // ===============================================================
+
+    match /invitations/{email} {
+
+      allow get: if isAuthenticated() &&
+        (request.auth.token.email == email || isAdmin() || isTeacher());
+
+      allow list: if isAuthenticated() && (
+        isAdmin() || 
+        (isTeacher() && resource.data.teacherId == request.auth.uid)
+      );
+
+      allow create: if isAdmin() ||
+        (isTeacher() &&
+          incoming().role == 'student' &&
+          incoming().teacherId == request.auth.uid);
+
+      allow update, delete: if isAdmin() ||
+        (isTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    // ===============================================================
+    // Rooms (COMPETITIVE MULTIPLAYER)
+    // ===============================================================
+
+    function isValidRoomStatus(s) {
+      return s in ['waiting', 'playing', 'finished'];
+    }
+
+    function isValidPlayerStatus(s) {
+      return s in ['alive', 'dead', 'spectator'];
+    }
+
+    function isValidTeam(t) {
+      return t in ['A', 'B', 'none'];
+    }
+
+    function isValidGameState(data) {
+      return data.keys().hasAll(['hostId', 'mode', 'status', 'players']) &&
+        data.hostId is string &&
+        data.mode in ['ffa', 'teams'] &&
+        isValidRoomStatus(data.status) &&
+        data.players is map &&
+        data.players.keys().size() <= 4;
+    }
+
+    match /rooms {
+      allow list: if isAuthenticated();
+      match /{roomId} {
+        allow get, read: if isAuthenticated();
+
+        allow create: if isAuthenticated()
+          && isValidId(roomId)
+          && isValidGameState(incoming())
+          && incoming().hostId == request.auth.uid
+          && incoming().status == 'waiting'
+          && incoming().players.keys().hasAll([request.auth.uid])
+          && incoming().players.keys().size() == 1;
+
+        allow update: if isAuthenticated()
+          && (
+            // Host actions
+            (resource.data.hostId == request.auth.uid && isValidGameState(incoming())) ||
+            // Player join
+            (resource.data.status == 'waiting' && 
+             resource.data.players.keys().size() < 4 &&
+             incoming().players.keys().size() > resource.data.players.keys().size() &&
+             incoming().players.keys().hasAll(resource.data.players.keys()) &&
+             incoming().players.keys().hasAny([request.auth.uid]) &&
+             isValidGameState(incoming())) ||
+             // Player update/death
+             (resource.data.players.keys().hasAny([request.auth.uid]) && isValidGameState(incoming()))
+          );
+
+        allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.hostId);
+
+        match /projectiles/{projectileId} {
+          allow read, create: if isAuthenticated();
+          allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+        }
+      }
+    }
+
+    // ===============================================================
+    // DEFAULT BLOCK
+    // ===============================================================
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
