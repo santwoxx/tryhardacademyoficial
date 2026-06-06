@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 dotenv.config();
 
@@ -68,51 +67,55 @@ app.post('/api/gemini', async (req, res) => {
   }
 });
 
-// Mercado Pago Checkout Endpoint
+// Cakto API Checkout Endpoint
 app.post('/api/checkout', async (req, res) => {
   const { uid, email } = req.body;
   
-  if (!process.env.MP_ACCESS_TOKEN && !process.env.MP_CLIENT_SECRET) {
-    return res.status(500).json({ error: 'Mercado Pago keys are not configured on the backend.' });
+  const clientId = process.env.CAKTO_CLIENT_ID;
+  const clientSecret = process.env.CAKTO_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return res.status(500).json({ error: 'Cakto keys are not configured on the backend.' });
   }
 
   try {
-    // In production, you would use MP_ACCESS_TOKEN. 
-    // Here we initialize the client (assuming MP_ACCESS_TOKEN is provided in Render envs)
-    const client = new MercadoPagoConfig({ 
-      accessToken: process.env.MP_ACCESS_TOKEN || process.env.MP_CLIENT_SECRET,
-      options: { timeout: 5000 }
+    // 1. Obter Access Token via OAuth2 da Cakto
+    const tokenResponse = await fetch('https://api.cakto.com.br/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials'
+      })
     });
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      console.error('Falha ao autenticar na Cakto:', tokenData);
+      return res.status(401).json({ error: 'Falha na autenticação com a Cakto.' });
+    }
+
+    const accessToken = tokenData.access_token;
+
+    // 2. Gerar/Obter o link de checkout (Requer configurar Oferta/Produto na Cakto)
+    // OBS: Como a Cakto trabalha com links estáticos de ofertas, você geralmente
+    // não precisa gerar um checkout dinâmico, apenas redirecionar para a oferta com os parâmetros.
+    // Exemplo de link da oferta: https://pay.cakto.com.br/SUA_OFERTA
     
-    const preference = new Preference(client);
+    // Como a integração exata depende do ID do seu produto criado lá no painel,
+    // aqui nós retornamos a URL simulada ou você pode preencher o ID da sua oferta abaixo.
+    const checkoutBaseUrl = 'https://pay.cakto.com.br/COLOQUE_AQUI_O_ID_DA_SUA_OFERTA';
+    
+    // Adicionamos o e-mail e UID na URL para rastrear quem comprou via Webhook depois!
+    const checkoutUrl = `${checkoutBaseUrl}?email=${encodeURIComponent(email || '')}&src=${uid}`;
 
-    const response = await preference.create({
-      body: {
-        items: [
-          {
-            id: 'tryhard-vip',
-            title: 'Tryhard VIP - Acesso Ilimitado',
-            quantity: 1,
-            unit_price: 14.90,
-            currency_id: 'BRL',
-          }
-        ],
-        payer: {
-          email: email || 'usuario@tryhard.com'
-        },
-        external_reference: uid,
-        back_urls: {
-          success: 'https://tryhardacademyoficial.vercel.app',
-          failure: 'https://tryhardacademyoficial.vercel.app',
-          pending: 'https://tryhardacademyoficial.vercel.app'
-        },
-        auto_return: 'approved'
-      }
-    });
-
-    res.json({ checkoutUrl: response.init_point });
+    res.json({ checkoutUrl });
   } catch (error) {
-    console.error('Error generating checkout from Mercado Pago:', error);
+    console.error('Error generating checkout from Cakto:', error);
     res.status(500).json({ error: 'Failed to generate checkout link.' });
   }
 });
