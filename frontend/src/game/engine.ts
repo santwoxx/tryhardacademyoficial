@@ -447,7 +447,11 @@ export class PowerUp {
         ctx.scale(scale, scale);
 
         if (quality !== 'low') {
-            ctx.shadowBlur = 20;
+            if (!quality || quality === 'low') {
+                ctx.shadowBlur = 0;
+            } else {
+                ctx.shadowBlur = 20;
+            }
             ctx.shadowColor = this.color;
             
             // Outer rotating ring
@@ -1760,6 +1764,8 @@ export class Bot extends Player {
             ctx.lineWidth = quality === 'high' ? 5 : 3;
             ctx.lineJoin = 'round';
             ctx.save();
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = quality === 'high' ? 20 : 10;
             ctx.rotate(this.angle);
             this.drawBotShape(ctx);
             ctx.stroke();
@@ -2069,10 +2075,10 @@ export class Game {
         );
         
         // Set isMobile early for use in later initializations
-        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
-        // Performance optimization: Lower resolution for mobile to improve fill-rate
-        this.pixelRatio = this.isMobile ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio;
+        // LIMIT PIXEL RATIO ON MOBILE FOR MASSIVE PERFORMANCE BOOST
+        this.pixelRatio = this.isMobile ? 1.0 : Math.min(window.devicePixelRatio || 1, 2.0);
 
         // Ensure canvas has dimensions before initializing player
         if (canvas.width === 0 || canvas.height === 0) {
@@ -2332,7 +2338,7 @@ export class Game {
             this.ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
             
             // Outer glow for border
-            this.ctx.shadowBlur = 25;
+            this.ctx.shadowBlur = this.isMobile || this.quality === 'low' ? 0 : 25;
             this.ctx.shadowColor = `hsla(${hue}, ${saturation}%, 50%, 0.6)`;
             this.ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
             this.ctx.restore();
@@ -2435,8 +2441,14 @@ export class Game {
         triggerGameSfx('powerup'); // Use powerup sound for teleport for now
     }
     private spawnParticles(x: number, y: number, color: string, count: number = 10, speed: number = 2, glow: boolean = true) {
-        if (this.quality === 'low') return;
-        const adjustedCount = this.quality === 'medium' ? Math.ceil(count * 0.5) : count;
+        if (this.quality === 'low' && count > 5) count = 5;
+        
+        // Massive optimization for mobile: 70% fewer particles
+        let adjustedCount = count;
+        if (this.isMobile) {
+            adjustedCount = Math.max(1, Math.floor(count * 0.3));
+        }
+
         this.pool.spawn(x, y, color, adjustedCount, speed, glow);
     }
 
