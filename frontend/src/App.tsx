@@ -1018,9 +1018,10 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const joystickRef = useRef<HTMLDivElement>(null);
+  const playtimeRef = useRef<{ time: number, date: string, isVIP: boolean }>({ time: 0, date: '', isVIP: false });
   const [userTypeSelection, setUserTypeSelection] = useState<'player' | 'teacher' | null>(null);
   const [isTouch, setIsTouch] = useState(false);
-  const [gameState, setGameState] = useState<'auth' | 'menu' | 'playing' | 'lobby' | 'admin-panel' | 'teacher-panel'>('auth');
+  const [gameState, setGameState] = useState<'auth' | 'menu' | 'playing' | 'lobby' | 'admin-panel' | 'teacher-panel' | 'banned' | 'time-limit'>('auth');
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'set-nickname'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1353,7 +1354,7 @@ export default function App() {
             }
           }
 
-          if (u.email === "natanmarinhocanalyt@gmail.com") {
+          if (u.email === "natanmarinhocanalyt@gmail.com" || u.email === "brisasofc@gmail.com") {
             role = 'admin';
           }
 
@@ -1368,6 +1369,9 @@ export default function App() {
               role: role,
               teacherId,
               schoolName,
+              isVIP: false,
+              playtimeToday: 0,
+              lastPlayedDate: new Date().toISOString().split('T')[0],
               lastUpdate: fsServerTimestamp()
             };
             await setDoc(playerRef, newPlayerData);
@@ -1402,7 +1406,21 @@ export default function App() {
               data.schoolName = schoolName;
             }
 
+            if (data.banned) {
+              setGameState('banned');
+              setIsAuthChecked(true);
+              return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            if (data.lastPlayedDate !== today) {
+              data.playtimeToday = 0;
+              data.lastPlayedDate = today;
+              await updateDoc(playerRef, { playtimeToday: 0, lastPlayedDate: today });
+            }
+
             setPlayerData(data);
+
             if (data.nickname) setNickname(data.nickname);
             if (data.trophies !== undefined) setTrophies(data.trophies);
             if (data.level !== undefined) {
@@ -1470,6 +1488,54 @@ export default function App() {
       document.removeEventListener('touchend', handleTouchEnd);
     };
   }, []);
+
+  // Update playtime ref when data changes
+  useEffect(() => {
+    if (playerData) {
+      playtimeRef.current = {
+        time: playerData.playtimeToday || 0,
+        date: playerData.lastPlayedDate || new Date().toISOString().split('T')[0],
+        isVIP: playerData.isVIP || false
+      };
+    }
+  }, [playerData]);
+
+  // Track playtime while playing
+  useEffect(() => {
+    if (gameState !== 'playing' || !user) return;
+    
+    const interval = setInterval(() => {
+      const { time, date, isVIP } = playtimeRef.current;
+      if (isVIP) return;
+      
+      const today = new Date().toISOString().split('T')[0];
+      let newTime = time + 1;
+      let newDate = date;
+      
+      if (date !== today) {
+        newTime = 1;
+        newDate = today;
+      }
+      
+      playtimeRef.current = { time: newTime, date: newDate, isVIP };
+      
+      if (newTime >= 1800) {
+        setGameState('time-limit');
+        // If multiplayer, gracefully leave
+        if (room && socket) {
+          socket.emit('leaveRoom', room.id);
+          setRoom(null);
+        }
+      }
+      
+      if (newTime % 10 === 0) {
+        const playerRef = doc(firestore, 'players', user.uid);
+        updateDoc(playerRef, { playtimeToday: newTime, lastPlayedDate: newDate }).catch(() => {});
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [gameState, user, room, socket]);
 
   // Notification listener
   useEffect(() => {
@@ -3439,6 +3505,81 @@ export default function App() {
         <div className="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent z-[1000] opacity-30" />
 
         <AnimatePresence mode="wait">
+        {gameState === 'banned' && (
+          <motion.div 
+            key="banned-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] p-4 text-center"
+          >
+            <div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center border-2 border-red-500 mb-6">
+              <AlertCircle className="w-12 h-12 text-red-500" />
+            </div>
+            <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic mb-4">Conta Suspensa</h1>
+            <p className="text-white/60 max-w-md mx-auto mb-8 leading-relaxed">
+              Sua conta foi permanentemente banida da Tryhard Academy devido a violações das regras do jogo ou uso de trapaças.
+            </p>
+            <button 
+              onClick={() => auth.signOut()}
+              className="px-8 py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
+            >
+              Sair da Conta
+            </button>
+          </motion.div>
+        )}
+
+        {gameState === 'time-limit' && (
+          <motion.div 
+            key="time-limit-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] p-4 text-center"
+          >
+            <div className="w-24 h-24 rounded-full bg-yellow-500/10 flex items-center justify-center border-2 border-yellow-500 mb-6">
+              <Timer className="w-12 h-12 text-yellow-500" />
+            </div>
+            <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic mb-4">Tempo Esgotado</h1>
+            <p className="text-white/60 max-w-md mx-auto mb-8 leading-relaxed">
+              Você atingiu o limite de 30 minutos diários gratuitos.<br/><br/>
+              Assine o plano <span className="text-[#bc13fe] font-black uppercase">Tryhard VIP</span> (R$ 14,90/mês) para jogar ilimitado todos os dias!
+            </p>
+            <div className="flex flex-col gap-4 w-full max-w-xs">
+              <button 
+                onClick={async () => {
+                  // Lógica para chamar API de checkout do Mercado Pago / Backend
+                  try {
+                    const response = await fetch(import.meta.env.VITE_API_URL + '/api/checkout', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ uid: user?.uid, email: user?.email })
+                    });
+                    const data = await response.json();
+                    if (data.checkoutUrl) {
+                      window.location.href = data.checkoutUrl;
+                    } else {
+                      alert('Erro ao gerar checkout. Tente novamente mais tarde.');
+                    }
+                  } catch (e) {
+                    alert('Erro de conexão com o servidor de pagamentos.');
+                  }
+                }}
+                className="w-full py-4 bg-[#bc13fe] text-white rounded-xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(188,19,254,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShoppingBag className="w-5 h-5" />
+                ASSINAR VIP
+              </button>
+              <button 
+                onClick={() => auth.signOut()}
+                className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
+              >
+                Sair da Conta
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {gameState === 'auth' && (
           <motion.div 
             key="auth-screen"

@@ -33,6 +33,7 @@ interface PendingTeacher {
 export const AdminDashboard: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [pendingTeachers, setPendingTeachers] = useState<PendingTeacher[]>([]);
+  const [allPlayers, setAllPlayers] = useState<any[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [newSchool, setNewSchool] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,9 +62,16 @@ export const AdminDashboard: React.FC<{ onClose: () => void }> = ({ onClose }) =
       setInvitations(list.map(t => ({ email: t.email || '', role: 'teacher', createdAt: 0, uid: t.uid, nickname: t.nickname } as any)));
     });
 
+    // Listen for all players (for banning)
+    const allPlayersQuery = fsQuery(playersRef, fsLimit(100));
+    const unsubscribeAll = onSnapshot(allPlayersQuery, (snapshot) => {
+      setAllPlayers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubscribePending();
       unsubscribeApproved();
+      unsubscribeAll();
     };
   }, []);
 
@@ -118,6 +126,21 @@ export const AdminDashboard: React.FC<{ onClose: () => void }> = ({ onClose }) =
     }
   };
 
+  const handleBanPlayer = async (uid: string, name: string, isBanned: boolean) => {
+    if (!confirm(`${isBanned ? 'Desbanir' : 'Banir'} o jogador ${name}?`)) return;
+    try {
+      setLoading(true);
+      const playerRef = doc(firestore, 'players', uid);
+      await updateDoc(playerRef, { banned: !isBanned });
+      setSuccess(`Jogador ${name} ${isBanned ? 'desbanido' : 'banido'}.`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError('Erro: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -142,7 +165,7 @@ export const AdminDashboard: React.FC<{ onClose: () => void }> = ({ onClose }) =
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-hidden flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 overflow-hidden flex-1">
           {/* Pending Approvals */}
           <div className="flex flex-col overflow-hidden">
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex-1 overflow-hidden flex flex-col">
@@ -240,6 +263,44 @@ export const AdminDashboard: React.FC<{ onClose: () => void }> = ({ onClose }) =
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* All Players List */}
+          <div className="flex flex-col overflow-hidden">
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col h-full">
+              <h2 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-red-500" />
+                Jogadores ({allPlayers.length})
+              </h2>
+
+              <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                {allPlayers.map((player: any) => (
+                  <div 
+                    key={player.uid}
+                    className={`bg-black/40 border rounded-2xl p-4 flex items-center justify-between group transition-all ${player.banned ? 'border-red-500/50 bg-red-500/10' : 'border-white/5 hover:border-white/20'}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                          {player.nickname}
+                          {player.banned && <span className="text-[8px] bg-red-500 text-white px-2 py-0.5 rounded-full">BANIDO</span>}
+                        </p>
+                        <p className="text-[10px] font-bold text-white/40">Lvl {player.level || 1} • {player.role}</p>
+                      </div>
+                    </div>
+                    {player.role !== 'admin' && (
+                      <button 
+                        onClick={() => handleBanPlayer(player.uid, player.nickname, player.banned)}
+                        className={`p-2 rounded-lg transition-all ${player.banned ? 'text-green-500 hover:bg-green-500/20' : 'text-red-500/50 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100'}`}
+                        title={player.banned ? "Desbanir" : "Banir Jogador"}
+                      >
+                        {player.banned ? <CheckCircle2 className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
