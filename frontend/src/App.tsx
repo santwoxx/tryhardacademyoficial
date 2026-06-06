@@ -3999,7 +3999,14 @@ export default function App() {
                 <Trophy className="w-24 h-24 text-white mx-auto mb-4" />
               </motion.div>
               <h2 className="text-white text-6xl font-black uppercase tracking-tighter italic">NÍVEL {currentLevel}!</h2>
-              <p className="text-white/80 text-sm uppercase tracking-[0.4em] mt-2 font-bold">Dificuldade Aumentada</p>
+              <p className="text-white/80 text-sm uppercase tracking-[0.4em] mt-2 font-bold mb-4">Dificuldade Aumentada</p>
+              
+              {SKINS.find(s => s.id === currentLevel) && (
+                <div className="mt-6 pt-6 border-t border-white/20">
+                  <span className="text-[#ffea00] text-xs font-black uppercase tracking-[0.3em] block mb-2">Skin Desbloqueada</span>
+                  <span className="text-white text-2xl font-black italic">{SKINS.find(s => s.id === currentLevel)?.name}</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
