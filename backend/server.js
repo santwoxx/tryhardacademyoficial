@@ -89,51 +89,14 @@ app.post('/api/gemini', async (req, res) => {
 app.post('/api/checkout', async (req, res) => {
   const { uid, email } = req.body;
   
-  const clientId = process.env.CAKTO_CLIENT_ID;
-  const clientSecret = process.env.CAKTO_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    return res.status(500).json({ error: 'Cakto keys are not configured on the backend.' });
-  }
-
   try {
-    // 1. Obter Access Token via OAuth2 da Cakto
-    const tokenResponse = await fetch('https://api.cakto.com.br/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: 'client_credentials'
-      })
-    });
-
-    const tokenData = await tokenResponse.json();
-
-    if (!tokenData.access_token) {
-      console.error('Falha ao autenticar na Cakto:', tokenData);
-      return res.status(401).json({ error: 'Falha na autenticação com a Cakto.' });
-    }
-
-    const accessToken = tokenData.access_token;
-
-    // 2. Gerar/Obter o link de checkout (Requer configurar Oferta/Produto na Cakto)
-    // OBS: Como a Cakto trabalha com links estáticos de ofertas, você geralmente
-    // não precisa gerar um checkout dinâmico, apenas redirecionar para a oferta com os parâmetros.
-    // Exemplo de link da oferta: https://pay.cakto.com.br/SUA_OFERTA
-    
-    // Como a integração exata depende do ID do seu produto criado lá no painel,
-    // aqui nós retornamos a URL simulada ou você pode preencher o ID da sua oferta abaixo.
+    // Retorna o link de checkout estático com os parâmetros do usuário para rastreio
     const checkoutBaseUrl = 'https://pay.cakto.com.br/u5h6im8_850195';
-    
-    // Adicionamos o e-mail e UID na URL para rastrear quem comprou via Webhook depois!
     const checkoutUrl = `${checkoutBaseUrl}?email=${encodeURIComponent(email || '')}&src=${uid}`;
 
     res.json({ checkoutUrl });
   } catch (error) {
-    console.error('Error generating checkout from Cakto:', error);
+    console.error('Error generating checkout:', error);
     res.status(500).json({ error: 'Failed to generate checkout link.' });
   }
 });
