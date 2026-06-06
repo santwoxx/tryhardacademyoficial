@@ -1036,6 +1036,11 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showStore, setShowStore] = useState(false);
   const [showMissionsMenu, setShowMissionsMenu] = useState(false);
+  const [showRotatePrompt, setShowRotatePrompt] = useState(false);
+  const [pendingStartAction, setPendingStartAction] = useState<(() => void) | null>(null);
+  const [isLandscape, setIsLandscape] = useState(
+    () => typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : true
+  );
   const [currentSkinId, setCurrentSkinId] = useState<number | string>(() => {
     const saved = localStorage.getItem('selectedSkinId');
     if (saved) {
@@ -1257,6 +1262,29 @@ export default function App() {
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  // Track orientation so modals adapt and the rotate prompt auto-resolves
+  useEffect(() => {
+    const checkOrientation = () => {
+      const landscape = window.innerWidth > window.innerHeight;
+      setIsLandscape(landscape);
+      // Auto-confirm rotation if user rotated while prompt was open
+      if (landscape && showRotatePrompt) {
+        setShowRotatePrompt(false);
+        if (pendingStartAction) {
+          pendingStartAction();
+          setPendingStartAction(null);
+        }
+      }
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, [showRotatePrompt, pendingStartAction]);
 
   // Background music management
   useEffect(() => {
@@ -3113,6 +3141,17 @@ export default function App() {
       console.error("Leave Room Error:", error);
     }
   };
+  // Wraps an "enter game" action with the mobile-rotate prompt
+  const beginGameWithRotationCheck = (action: () => void) => {
+    triggerHaptic();
+    if (isTouch && !isLandscape) {
+      setPendingStartAction(() => action);
+      setShowRotatePrompt(true);
+    } else {
+      action();
+    }
+  };
+
   const handleStartGame = async () => {
     // Unblock audio
     audioManager.init();
@@ -3732,7 +3771,7 @@ export default function App() {
                   {/* PRATICAR */}
                   <motion.button 
                     whileHover={{ x: 8 }}
-                    onClick={() => { handleStartGame(); requestLandscape(); triggerHaptic(); }}
+                    onClick={() => { beginGameWithRotationCheck(() => { handleStartGame(); requestLandscape(); }); }}
                     className="w-full text-left p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:border-cyan-500/50 hover:bg-cyan-500/[0.05] flex items-center justify-between group transition-all duration-300 relative overflow-hidden"
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
@@ -4178,7 +4217,7 @@ export default function App() {
                     <div className="flex gap-4 w-full pt-4">
                       {room.hostId === user.uid && (
                         <button 
-                          onClick={handleStartMultiplayerGame}
+                          onClick={() => beginGameWithRotationCheck(() => { handleStartMultiplayerGame(); requestLandscape(); })}
                           disabled={loading || room.playerIds.length < 2}
                           className="flex-1 bg-[#00f2ff] hover:bg-[#00d8e6] text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 disabled:opacity-50 disabled:grayscale shadow-[0_0_30px_rgba(0,242,255,0.4)]"
                         >
@@ -4767,65 +4806,132 @@ export default function App() {
           </motion.div>
         )}
 
+        {showRotatePrompt && (
+          <motion.div
+            key="rotate-prompt"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[400] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              className="bg-gradient-to-b from-cyan-500/10 to-[#bc13fe]/10 border border-cyan-400/40 p-6 md:p-8 rounded-[2rem] w-full max-w-sm text-center backdrop-blur-xl relative shadow-[0_0_60px_rgba(0,242,255,0.25)]"
+            >
+              <CornerDecoration className="text-cyan-400 -inset-4 opacity-100" />
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+
+              {/* Animated rotating phone icon */}
+              <div className="relative mx-auto mb-6 w-24 h-24">
+                <motion.div
+                  animate={{ rotate: [0, 90, 90, 0, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', times: [0, 0.4, 0.5, 0.9, 1] }}
+                  className="w-full h-full flex items-center justify-center"
+                >
+                  <Smartphone className="w-16 h-16 text-cyan-400 drop-shadow-[0_0_15px_rgba(0,242,255,0.6)]" strokeWidth={1.5} />
+                </motion.div>
+                <motion.div
+                  animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="absolute inset-0 rounded-full border-2 border-cyan-400/40"
+                />
+              </div>
+
+              <div className="inline-block px-3 py-1 bg-cyan-500/20 border border-cyan-400/30 text-cyan-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4 italic">
+                Modo Paisagem
+              </div>
+
+              <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic mb-3 leading-tight">
+                Vire o celular na <span className="text-cyan-400">horizontal</span>
+              </h2>
+
+              <p className="text-white/60 text-sm font-medium mb-6 leading-relaxed">
+                O TryHard Academy foi feito para ser jogado em tela deitada. Incline o aparelho para iniciar.
+              </p>
+
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => {
+                    setShowRotatePrompt(false);
+                    if (pendingStartAction) {
+                      pendingStartAction();
+                      setPendingStartAction(null);
+                    }
+                  }}
+                  className="w-full bg-cyan-400 hover:bg-cyan-300 text-black font-black py-3.5 rounded-2xl text-sm uppercase tracking-[0.2em] transition-all active:scale-95 shadow-[0_0_30px_rgba(0,242,255,0.4)] flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Virei! Começar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRotatePrompt(false);
+                    if (pendingStartAction) {
+                      pendingStartAction();
+                      setPendingStartAction(null);
+                    }
+                  }}
+                  className="w-full bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 font-bold py-2.5 rounded-2xl text-[10px] uppercase tracking-[0.3em] transition-all"
+                >
+                  Jogar de qualquer jeito
+                </button>
+              </div>
+
+              <p className="text-white/30 text-[9px] uppercase tracking-widest mt-4 font-bold">
+                O jogo detecta automaticamente quando você virar
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+
         {showGameOver && (
-          <motion.div 
+          <motion.div
             key="game-over-screen"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/98 backdrop-blur-3xl p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/98 backdrop-blur-3xl p-3 md:p-4 overflow-y-auto"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, y: 40, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              className="bg-black/40 border border-red-500/40 p-12 rounded-[2rem] w-full max-w-md text-center backdrop-blur-xl relative"
+              className="bg-black/40 border border-red-500/40 p-5 md:p-8 landscape:p-4 rounded-[2rem] w-full max-w-md max-h-[95vh] overflow-y-auto text-center backdrop-blur-xl relative"
             >
               <CornerDecoration className="text-red-500 -inset-4 opacity-100" />
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
 
-              <div className="inline-block px-4 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.4em] mb-8 italic">
+              <div className="inline-block px-4 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.4em] mb-4 md:mb-6 landscape:mb-2 italic">
                 Sinal de Vida Perdido
               </div>
 
-              <h2 className="text-red-500 text-7xl font-black uppercase tracking-tighter italic mb-10 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]">
+              <h2 className="text-red-500 text-5xl md:text-6xl landscape:text-4xl font-black uppercase tracking-tighter italic mb-6 md:mb-8 landscape:mb-3 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]">
                 GAME<br/><span className="text-white">OVER</span>
               </h2>
-              
-              <div className="flex flex-col gap-3 mb-12">
+
+              <div className="flex flex-col gap-2 mb-6 md:mb-8 landscape:mb-3 landscape:flex-row landscape:gap-2">
                 {[
-                  { label: 'Oponentes Abatidos', val: stats.kills, icon: Target, color: 'text-cyan-400' },
-                  { label: 'Tempo em Combate', val: `${survivalTime}s`, icon: Timer, color: 'text-yellow-400' },
-                  { label: 'Pontuação Máxima', val: highScore, icon: Trophy, color: 'text-[#bc13fe]' }
+                  { label: 'Oponentes', val: stats.kills, icon: Target, color: 'text-cyan-400' },
+                  { label: 'Tempo', val: `${survivalTime}s`, icon: Timer, color: 'text-yellow-400' },
+                  { label: 'Recorde', val: highScore, icon: Trophy, color: 'text-[#bc13fe]' }
                 ].map((stat, i) => (
-                  <div key={i} className="hud-card !bg-black/60 flex justify-between items-center group">
-                    <div className="flex items-center gap-3">
-                      <stat.icon className={`w-4 h-4 ${stat.color} opacity-60`} />
-                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{stat.label}</span>
+                  <div key={i} className="hud-card !bg-black/60 flex justify-between items-center group landscape:flex-col landscape:items-center landscape:gap-0 landscape:!py-1.5 landscape:!px-2 flex-1">
+                    <div className="flex items-center gap-2 landscape:gap-1">
+                      <stat.icon className={`w-3.5 h-3.5 landscape:w-3 landscape:h-3 ${stat.color} opacity-60`} />
+                      <span className="text-[9px] landscape:text-[8px] font-black text-white/40 uppercase tracking-widest">{stat.label}</span>
                     </div>
-                    <span className="text-xl font-black text-white italic tabular-nums">{stat.val}</span>
+                    <span className="text-base landscape:text-sm font-black text-white italic tabular-nums">{stat.val}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2 md:gap-3 landscape:gap-2 landscape:flex-row">
                 <button
                   onClick={handleRestart}
-                  className="game-btn-danger py-6 text-xl shadow-[0_0_40px_rgba(239,68,68,0.4)]"
+                  className="game-btn-danger py-3 md:py-5 landscape:py-2 text-base md:text-lg landscape:text-sm shadow-[0_0_40px_rgba(239,68,68,0.4)] flex-1 landscape:flex-none"
                 >
-                  <Zap className="w-6 h-6 fill-white" />
-                  REINICIAR SEQUÊNCIA
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowGameOver(false);
-                    setGameState('menu');
-                    setShowStore(true);
-                  }}
-                  className="game-btn-secondary py-5 text-xs text-[#bc13fe] border-[#bc13fe]/30"
-                >
-                  <ShoppingBag className="w-5 h-5" />
-                  PERSONALIZAR AGENTE
+                  <Zap className="w-5 h-5 landscape:w-4 landscape:h-4 fill-white" />
+                  REINICIAR
                 </button>
 
                 <button
@@ -4833,9 +4939,9 @@ export default function App() {
                     setShowGameOver(false);
                     setGameState('menu');
                   }}
-                  className="text-white/20 hover:text-white transition-colors text-[10px] font-black uppercase tracking-[0.4em] mt-2 underline decoration-red-500/30 underline-offset-8"
+                  className="text-white/30 hover:text-white transition-colors text-[10px] font-black uppercase tracking-[0.4em] mt-2 landscape:mt-0 underline decoration-red-500/30 underline-offset-8"
                 >
-                  SAIR PARA O LOGOUT
+                  SAIR PARA O MENU
                 </button>
               </div>
             </motion.div>
@@ -4843,49 +4949,47 @@ export default function App() {
         )}
 
         {showModal && currentQuestion && (
-          <motion.div 
+          <motion.div
             key="math-challenge"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-3 md:p-4 overflow-y-auto"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, y: 20 }}
-              animate={{ 
-                scale: 1, 
+              animate={{
+                scale: 1,
                 y: 0,
                 x: feedback === 'wrong' || feedback === 'timeout' ? [0, -10, 10, -10, 10, 0] : 0
               }}
               className={`relative bg-black/40 border-2 ${
-                feedback === 'correct' ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.3)]' : 
-                feedback === 'wrong' || feedback === 'timeout' ? 'border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)]' : 
+                feedback === 'correct' ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.3)]' :
+                feedback === 'wrong' || feedback === 'timeout' ? 'border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)]' :
                 'border-cyan-400 shadow-[0_0_50px_rgba(0,242,255,0.3)]'
-              } p-10 rounded-[2rem] w-full max-w-md backdrop-blur-3xl overflow-hidden`}
+              } p-5 md:p-8 landscape:p-4 rounded-[2rem] w-full max-w-md max-h-[95vh] overflow-y-auto backdrop-blur-3xl overflow-hidden`}
             >
               <CornerDecoration className={`${
-                feedback === 'correct' ? 'text-green-500' : 
+                feedback === 'correct' ? 'text-green-500' :
                 feedback === 'wrong' || feedback === 'timeout' ? 'text-red-500' : 'text-cyan-400'
               } -inset-4 opacity-100`} />
 
               {/* Header */}
-              <div className="flex justify-between items-center mb-10">
-                <div className="flex items-center gap-3 bg-black/60 px-4 py-2 rounded-xl border border-white/5">
+              <div className="flex justify-between items-center mb-4 md:mb-6 landscape:mb-2">
+                <div className="flex items-center gap-2 landscape:gap-1.5 bg-black/60 px-3 py-1.5 landscape:px-2 landscape:py-1 rounded-xl border border-white/5">
                   <div className={`w-2 h-2 rounded-full animate-pulse ${
-                    currentQuestion.difficulty === 'easy' ? 'bg-green-400' : 
+                    currentQuestion.difficulty === 'easy' ? 'bg-green-400' :
                     currentQuestion.difficulty === 'medium' ? 'bg-yellow-400' : 'bg-red-400'
                   }`} />
-                  <span className="text-[10px] uppercase font-black tracking-[0.3em] text-white/60 italic">Nível de Ameaça: 
-                    <span className="text-white ml-2">
-                       {currentQuestion.difficulty === 'easy' ? 'MÍNIMO' : 
-                        currentQuestion.difficulty === 'medium' ? 'MÉDIO' : 'CRÍTICO'}
-                    </span>
-                  </span>
+                  <span className="text-[10px] landscape:text-[8px] uppercase font-black tracking-[0.3em] text-white/60 italic">Nível: <span className="text-white ml-1 landscape:ml-0.5">
+                    {currentQuestion.difficulty === 'easy' ? 'MÍN' :
+                     currentQuestion.difficulty === 'medium' ? 'MÉD' : 'CRÍTICO'}
+                  </span></span>
                 </div>
 
                 <div className={`flex flex-col items-end`}>
-                  <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Backup Timer</div>
-                  <div className={`text-xl font-black tabular-nums tracking-tighter ${timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
+                  <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-0.5 landscape:hidden">Timer</div>
+                  <div className={`text-xl landscape:text-lg font-black tabular-nums tracking-tighter ${timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
                     00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
                   </div>
                 </div>
@@ -4894,31 +4998,31 @@ export default function App() {
               {/* Combo Multiplier */}
               <AnimatePresence>
                 {combo > 1 && !feedback && (
-                  <motion.div 
+                  <motion.div
                     initial={{ scale: 0, rotate: -20 }}
                     animate={{ scale: 1, rotate: 12 }}
-                    className="absolute top-12 right-12 bg-[#bc13fe] text-white px-4 py-2 rounded-xl font-black text-sm shadow-[0_0_20px_rgba(188,19,254,0.5)] border border-white/20 z-20"
+                    className="absolute top-8 right-8 landscape:top-4 landscape:right-4 bg-[#bc13fe] text-white px-3 py-1.5 landscape:px-2 landscape:py-0.5 rounded-xl font-black text-xs landscape:text-[10px] shadow-[0_0_20px_rgba(188,19,254,0.5)] border border-white/20 z-20"
                   >
                     COMBO X{combo}
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div className="text-center mb-10">
-                <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.5em] mb-4 opacity-40 italic underline decoration-cyan-400/30 underline-offset-4">Desafio de Processamento</div>
-                <h2 className="text-6xl md:text-7xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+              <div className="text-center mb-4 md:mb-6 landscape:mb-3">
+                <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.5em] mb-2 landscape:mb-1 opacity-40 italic underline decoration-cyan-400/30 underline-offset-4 landscape:hidden">Desafio de Processamento</div>
+                <h2 className="text-4xl md:text-6xl landscape:text-3xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
                   {currentQuestion.text}
                 </h2>
               </div>
 
               {/* Options */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2 md:gap-3 landscape:gap-2">
                 {deduplicateItems(currentQuestion?.options || [], (opt) => `option-${currentQuestion?.id}-${opt}`, 'QuestionOptions').map((opt) => (
                   <button
                     key={`option-${currentQuestion?.id}-${opt}`}
                     onClick={() => !feedback && handleAnswer(opt)}
                     disabled={!!feedback}
-                    className={`game-btn py-6 text-2xl font-black tabular-nums transition-all ${
+                    className={`game-btn py-3 md:py-5 landscape:py-2 text-lg md:text-2xl landscape:text-base font-black tabular-nums transition-all ${
                       feedback === 'correct' && opt === currentQuestion?.answer ? 'bg-green-500 border-green-400 text-white scale-105 shadow-[0_0_30px_rgba(34,197,94,0.5)]' :
                       feedback === 'wrong' && opt === selectedOption ? 'bg-red-500 border-red-500 text-white animate-shake shadow-[0_0_30px_rgba(239,68,68,0.5)]' :
                       'bg-black/60 border-white/10 text-white/80 hover:bg-white/10 hover:border-white/30'
@@ -4928,10 +5032,10 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              
+
               {/* Scanline Effect in Modal */}
               <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
-                <div className="w-full h-full" style={{ 
+                <div className="w-full h-full" style={{
                   backgroundImage: 'repeating-linear-gradient(0deg, #000 0px, #000 2px, transparent 2px, transparent 4px)',
                   backgroundSize: '100% 4px'
                 }} />
@@ -5033,7 +5137,7 @@ export default function App() {
               <button 
                 onClick={() => {
                   setShowMissionsMenu(false);
-                  handleStartGame();
+                  beginGameWithRotationCheck(() => { handleStartGame(); requestLandscape(); });
                 }}
                 className="bg-cyan-400 hover:bg-cyan-300 text-black px-12 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 shadow-[0_0_30px_rgba(0,242,255,0.3)]"
               >
