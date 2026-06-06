@@ -3759,6 +3759,34 @@ export default function App() {
                     <ShoppingBag size={14} className="text-[#bc13fe]" />
                   </motion.button>
 
+                  {/* ASSINAR VIP */}
+                  {!playerData?.isVIP && (
+                    <motion.button 
+                      whileHover={{ x: 6 }}
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(import.meta.env.VITE_API_URL + '/api/checkout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ uid: user?.uid, email: user?.email })
+                          });
+                          const data = await response.json();
+                          if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+                        } catch (e) {
+                          alert('Erro ao conectar com servidor de pagamento.');
+                        }
+                      }}
+                      className="w-full text-left py-3 px-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 hover:border-yellow-500 hover:bg-yellow-500/20 flex items-center justify-between group transition-all duration-300 relative overflow-hidden shadow-[0_0_15px_rgba(234,179,8,0.2)]"
+                    >
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
+                      <div>
+                        <span className="text-yellow-500 text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">SEJA VIP</span>
+                        <span className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Remover Limite de Tempo</span>
+                      </div>
+                      <Globe size={14} className="text-yellow-500 animate-pulse" />
+                    </motion.button>
+                  )}
+
                   {/* CHAT GLOBAL */}
                   <motion.button 
                     whileHover={{ x: 6 }}
