@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, Component, ReactNode } from 'react';
 import { Game, Projectile, RemotePlayer, GraphicQuality, Point, SKINS } from './game/engine';
 import { audioManager } from './game/audio';
-import { Heart, Zap, Settings, Trophy, Users, X, Crown, Timer, Star, AlertCircle, Target, Flag, CheckCircle2, BookOpen, Move, HelpCircle, Plus, Youtube, Lock, RotateCcw, Volume2, VolumeX, ShoppingBag, UserPlus, BarChart3, ShieldCheck, ChevronRight, Search, ArrowLeft, Maximize2, Minimize2, User, Globe, Bell, Trash2, Sword, Download, ArrowRight, MessageSquare, Send, Hash, WifiOff, Play } from 'lucide-react';
+import { Heart, Zap, Settings, Trophy, Users, X, Crown, Timer, Star, AlertCircle, Target, Flag, CheckCircle2, BookOpen, Move, HelpCircle, Plus, Youtube, Lock, RotateCcw, Volume2, VolumeX, ShoppingBag, UserPlus, BarChart3, ShieldCheck, ChevronRight, Search, ArrowLeft, Maximize2, Minimize2, User, Globe, Bell, Trash2, Sword, Download, ArrowRight, MessageSquare, Send, Hash, WifiOff, Play, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, firestore } from './firebase';
 import { 

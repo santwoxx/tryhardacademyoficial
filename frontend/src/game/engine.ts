@@ -32,9 +32,56 @@ Object.entries(GAME_SFX_CONFIG).forEach(([key, url]) => {
     });
 });
 
+// Audio Context para sons sintéticos (compatível com todos os navegadores móveis e iOS)
+let audioCtx: AudioContext | null = null;
+const initAudioCtx = () => {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+};
+
+const playSyntheticSound = (type: 'shoot' | 'hit') => {
+    initAudioCtx();
+    if (!audioCtx) return;
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    if (type === 'shoot') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'hit') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+        gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+    }
+};
+
 /** Plays a sound effect from the pool with volume control */
 const triggerGameSfx = (name: keyof typeof GAME_SFX_CONFIG, vol = 0.35) => {
     if (audioManager.getMuted()) return;
+    
+    // Usa sons sintéticos garantidos para tiro e acerto (bypassa bloqueio de .ogg do iOS)
+    if (name === 'shoot' || name === 'hit') {
+        playSyntheticSound(name);
+        return;
+    }
+
     const pool = SFX_POOLS[name];
     if (!pool) return;
     const sound = pool.find(s => s.paused || s.ended) || pool[0];
