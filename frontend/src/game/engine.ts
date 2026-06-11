@@ -316,7 +316,7 @@ export class Star {
 
 export class PowerUp {
     pos: Point;
-    type: 'shield' | 'rapid' | 'speed' | 'triple';
+    type: 'shield' | 'rapid' | 'speed' | 'triple' | 'bomb' | 'magnet';
     radius: number = 15;
     active: boolean = false;
     pulse: number = 0;
@@ -328,7 +328,7 @@ export class PowerUp {
         this.color = '#fff';
     }
 
-    init(x: number, y: number, type: 'shield' | 'rapid' | 'speed' | 'triple') {
+    init(x: number, y: number, type: 'shield' | 'rapid' | 'speed' | 'triple' | 'bomb' | 'magnet') {
         this.pos.x = x;
         this.pos.y = y;
         this.type = type;
@@ -339,6 +339,8 @@ export class PowerUp {
             case 'rapid': this.color = '#ffea00'; break;
             case 'speed': this.color = '#bc13fe'; break;
             case 'triple': this.color = '#ff4d00'; break;
+            case 'bomb': this.color = '#ff0055'; break;
+            case 'magnet': this.color = '#00ff88'; break;
         }
     }
 
@@ -356,11 +358,7 @@ export class PowerUp {
         ctx.scale(scale, scale);
 
         if (quality !== 'low') {
-            if (!quality || quality === 'low') {
-                ctx.shadowBlur = 0;
-            } else {
-                ctx.shadowBlur = 20;
-            }
+            ctx.shadowBlur = 20;
             ctx.shadowColor = this.color;
             
             // Outer rotating ring
@@ -454,6 +452,46 @@ export class PowerUp {
                 ctx.fillStyle = this.color;
                 ctx.fill();
                 break;
+
+            case 'bomb':
+                // Bomb body
+                ctx.moveTo(r * 0.6, 0);
+                ctx.arc(0, r * 0.1, r * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                // Cap
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-r * 0.2, -r * 0.5, r * 0.4, r * 0.2);
+                // Fuse
+                ctx.beginPath();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.moveTo(0, -r * 0.5);
+                ctx.quadraticCurveTo(r * 0.25, -r * 0.8, r * 0.4, -r * 0.75);
+                ctx.stroke();
+                // Spark
+                ctx.fillStyle = '#ffea00';
+                ctx.beginPath();
+                ctx.arc(r * 0.4, -r * 0.75, 3, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+
+            case 'magnet':
+                // U-shape magnet
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = this.color;
+                ctx.moveTo(-r * 0.35, -r * 0.4);
+                ctx.lineTo(-r * 0.35, 0);
+                ctx.arc(0, 0, r * 0.35, Math.PI, 0, true);
+                ctx.lineTo(r * 0.35, -r * 0.4);
+                ctx.stroke();
+                // Tips
+                ctx.fillStyle = '#ef4444'; // Red tip (North)
+                ctx.fillRect(-r * 0.5, -r * 0.5, r * 0.3, r * 0.15);
+                ctx.fillStyle = '#3b82f6'; // Blue tip (South)
+                ctx.fillRect(r * 0.2, -r * 0.5, r * 0.3, r * 0.15);
+                break;
         }
 
         ctx.restore();
@@ -527,6 +565,74 @@ export class Portal {
         ctx.beginPath();
         ctx.arc(0, 0, this.radius * 0.9, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+export class AnswerOrb {
+    pos: Point;
+    vel: Point;
+    text: string;
+    isCorrect: boolean;
+    radius: number = 32;
+    pulse: number = 0;
+    color: string;
+    glowColor: string;
+    isDead: boolean = false;
+
+    constructor(x: number, y: number, text: string, isCorrect: boolean, color: string = '#00f2ff') {
+        this.pos = { x, y };
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 0.5;
+        this.vel = { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+        this.text = text;
+        this.isCorrect = isCorrect;
+        this.color = color;
+        this.glowColor = color;
+    }
+
+    update(bounds: { width: number, height: number }, dt: number) {
+        const factor = dt / 16;
+        this.pos.x += this.vel.x * factor;
+        this.pos.y += this.vel.y * factor;
+        this.pulse += 0.05 * factor;
+
+        if (this.pos.x < this.radius) { this.pos.x = this.radius; this.vel.x *= -1; }
+        if (this.pos.x > bounds.width - this.radius) { this.pos.x = bounds.width - this.radius; this.vel.x *= -1; }
+        if (this.pos.y < this.radius) { this.pos.y = this.radius; this.vel.y *= -1; }
+        if (this.pos.y > bounds.height - this.radius) { this.pos.y = bounds.height - this.radius; this.vel.y *= -1; }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, quality: GraphicQuality = 'high') {
+        if (this.isDead) return;
+
+        ctx.save();
+        const scale = 1 + Math.sin(this.pulse) * 0.08;
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.scale(scale, scale);
+
+        if (quality !== 'low') {
+            Lighting.drawGlow(ctx, 0, 0, this.radius * 2, this.glowColor, 0.25);
+        }
+
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(10, 10, 10, 0.85)';
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius - 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        const fontLen = Math.max(10, 15 - Math.max(0, this.text.length - 4) * 1.5);
+        ctx.font = `bold ${fontLen}px "Space Grotesk", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.text, 0, 0);
 
         ctx.restore();
     }
@@ -1194,7 +1300,8 @@ export class Player {
         rapid: number;
         speed: number;
         triple: number;
-    } = { shield: 0, rapid: 0, speed: 0, triple: 0 };
+        magnet: number;
+    } = { shield: 0, rapid: 0, speed: 0, triple: 0, magnet: 0 };
 
     constructor(x: number, y: number) {
         this.pos = { x, y };
@@ -1288,6 +1395,7 @@ export class Player {
         this.powerUps.rapid = Math.max(0, this.powerUps.rapid - dt);
         this.powerUps.speed = Math.max(0, this.powerUps.speed - dt);
         this.powerUps.triple = Math.max(0, this.powerUps.triple - dt);
+        this.powerUps.magnet = Math.max(0, this.powerUps.magnet - dt);
 
         if (Math.abs(this.vel.x) > 0.05 || Math.abs(this.vel.y) > 0.05) {
             const targetAngle = Math.atan2(this.vel.y, this.vel.x);
@@ -1807,15 +1915,17 @@ export class RemotePlayer extends Player {
     targetPos: Point;
     targetVel: Point;
     targetAngle: number = 0;
-    lerpFactor: number = 0.1; // Smoother lerp
+    lerpFactor: number = 0.1;
     lastUpdateTime: number = 0;
+    maxLives: number = 3;
+    remotePowerUps: { shield: number; rapid: number; speed: number; triple: number; magnet: number } = { shield: 0, rapid: 0, speed: 0, triple: 0, magnet: 0 };
 
     constructor(uid: string, nickname: string, trophies: number, x: number, y: number) {
         super(x, y);
         this.uid = uid;
         this.nickname = nickname;
         this.trophies = trophies;
-        this.color = '#00f2ff'; // Cyan for remote players
+        this.color = '#00f2ff';
         this.targetPos = { x, y };
         this.targetVel = { x: 0, y: 0 };
         this.lastUpdateTime = Date.now();
@@ -1830,46 +1940,45 @@ export class RemotePlayer extends Player {
             this.targetVel = data.vel;
         }
         if (data.angle !== undefined) this.targetAngle = data.angle;
-        if (data.lives !== undefined) this.lives = data.lives;
+        if (data.lives !== undefined) {
+            this.lives = data.lives;
+            this.maxLives = Math.max(this.maxLives, data.lives);
+        }
         if (data.ammo !== undefined) this.ammo = data.ammo;
         if (data.nickname) this.nickname = data.nickname;
         if (data.trophies !== undefined) this.trophies = data.trophies;
         if (data.skinId !== undefined) this.skinId = data.skinId;
+        if (data.color) this.color = data.color;
+        if (data.shield !== undefined) this.remotePowerUps.shield = data.shield;
+        if (data.rapid !== undefined) this.remotePowerUps.rapid = data.rapid;
+        if (data.speed !== undefined) this.remotePowerUps.speed = data.speed;
         this.lastUpdateTime = Date.now();
     }
 
     updateInterpolation(dt: number, camera?: { x: number, y: number, scale: number, w: number, h: number }) {
-        // Dead Reckoning: Predict where the player should be based on their last known velocity
         const now = Date.now();
-        const timeSinceUpdate = (now - this.lastUpdateTime) / 16; // in frames (approx 60fps)
+        const timeSinceUpdate = (now - this.lastUpdateTime) / 16;
         
-        // Cap prediction to 15 frames (approx 250ms) for tighter control
         const predictionFrames = Math.min(15, timeSinceUpdate);
         
-        // Defensive check: ensure targetPos and targetVel exist
         if (!this.targetPos || !this.targetVel) return;
 
-        // Predicted target position
         const predictedX = this.targetPos.x + this.targetVel.x * predictionFrames;
         const predictedY = this.targetPos.y + this.targetVel.y * predictionFrames;
 
-        // Dynamic lerp factor: if distance is large, move faster to catch up
         const dx = predictedX - this.pos.x;
         const dy = predictedY - this.pos.y;
         const distSq = dx * dx + dy * dy;
         
-        // Adaptive lerp factor for ultra-fluid movement
-        let dynamicLerp = 0.15; // Increased base lerp
-        if (distSq > 1600) dynamicLerp = 0.35; // > 40px
-        if (distSq > 6400) dynamicLerp = 0.6;  // > 80px
-        if (distSq > 22500) { // > 150px - snap to prevent desync
+        let dynamicLerp = 0.15;
+        if (distSq > 1600) dynamicLerp = 0.35;
+        if (distSq > 6400) dynamicLerp = 0.6;
+        if (distSq > 22500) {
             this.pos.x = predictedX;
             this.pos.y = predictedY;
             return;
         }
 
-        // Smoothly interpolate towards predicted target position
-        // Using a time-corrected lerp factor for consistency
         const factor = 1 - Math.pow(1 - dynamicLerp, dt / 16);
         
         this.pos.x += dx * factor;
@@ -1878,13 +1987,63 @@ export class RemotePlayer extends Player {
         this.vel.x += (this.targetVel.x - this.vel.x) * factor;
         this.vel.y += (this.targetVel.y - this.vel.y) * factor;
 
-        // Interpolate angle
         let diff = this.targetAngle - this.angle;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
         this.angle += diff * factor;
 
         this.trail.update(this.pos.x, this.pos.y);
+        
+        // Decrement timers
+        this.remotePowerUps.shield = Math.max(0, this.remotePowerUps.shield - dt);
+        this.remotePowerUps.rapid = Math.max(0, this.remotePowerUps.rapid - dt);
+        this.remotePowerUps.speed = Math.max(0, this.remotePowerUps.speed - dt);
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: { x: number, y: number, scale: number, w: number, h: number }, quality: GraphicQuality = 'high') {
+        super.draw(ctx, camera, quality);
+        this.drawHealthBar(ctx);
+        this.drawShieldIndicator(ctx);
+    }
+
+    private drawHealthBar(ctx: CanvasRenderingContext2D) {
+        if (this.lives <= 0) return;
+        const barWidth = 40;
+        const barHeight = 5;
+        const x = this.pos.x - barWidth / 2;
+        const y = this.pos.y + this.radius + 8;
+
+        ctx.save();
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.roundRect(x, y, barWidth, barHeight, 2);
+        ctx.fill();
+
+        // Health fill
+        const healthRatio = Math.max(0, this.lives / this.maxLives);
+        const fillColor = healthRatio > 0.5 ? '#22c55e' : healthRatio > 0.25 ? '#eab308' : '#ef4444';
+        ctx.fillStyle = fillColor;
+        ctx.roundRect(x, y, barWidth * healthRatio, barHeight, 2);
+        ctx.fill();
+
+        // Border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.roundRect(x, y, barWidth, barHeight, 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    private drawShieldIndicator(ctx: CanvasRenderingContext2D) {
+        if (this.remotePowerUps.shield <= 0) return;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 242, 255, 0.5)';
+        ctx.lineWidth = 2;
+        const pulse = Math.sin(Date.now() / 200) * 0.1 + 1;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, this.radius * pulse + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
     }
 }
 
@@ -1922,6 +2081,7 @@ export class Game {
     paused: boolean = false;
     gameOver: boolean = false;
     isMultiplayer: boolean = false;
+    isCoop: boolean = false;
     isHost: boolean = false;
     isMobile: boolean = false;
     performanceMode: boolean = false;
@@ -1929,6 +2089,11 @@ export class Game {
     isRunning: boolean = false;
     currentTargetPos: Point | null = null;
     currentTargetId: string | null = null;
+    activeQuestion: any = null;
+    activeOrbs: AnswerOrb[] = [];
+    questionTimeLeft: number = 0;
+    onInGameQuestionStart?: (q: any, timeLimit: number) => void;
+    onInGameAnswerResult?: (isCorrect: boolean, question: any, isTimeout: boolean) => void;
     onStarCollected?: (index?: number) => void;
     onBotKilled?: (type: string) => void;
     onGameOver?: () => void;
@@ -2062,6 +2227,8 @@ export class Game {
         this.paused = false;
         this.starSpawnTimer = 0;
         this.gameState = 'playing';
+        this.activeQuestion = null;
+        this.activeOrbs = [];
     }
 
     setQuality(quality: GraphicQuality) {
@@ -2072,12 +2239,34 @@ export class Game {
     getMiniMapData() {
         const remotes = Array.from(this.remotePlayers.values()).map(r => ({
             pos: { x: r.pos.x, y: r.pos.y },
-            color: r.color
+            color: r.color,
+            nickname: r.nickname
+        }));
+        const activePowerUps = this.powerUps.filter(p => p.active).map(p => ({
+            pos: { x: p.pos.x, y: p.pos.y },
+            type: p.type,
+            color: p.color
+        }));
+        const activeStars = this.stars.filter(s => !s.isDead).map(s => ({
+            pos: { x: s.pos.x, y: s.pos.y }
+        }));
+        const botsData = this.bots.filter(b => b.lives > 0).map(b => ({
+            pos: { x: b.pos.x, y: b.pos.y },
+            color: b.color
+        }));
+        const activeProjectiles = this.projectilePool.getActive().filter(p => p.active).map(p => ({
+            pos: { x: p.pos.x, y: p.pos.y },
+            owner: p.owner
         }));
         return {
             playerPos: { x: this.player.pos.x, y: this.player.pos.y },
+            playerAngle: this.player.angle,
             playerColor: this.player.color,
             remotePlayers: remotes,
+            powerUps: activePowerUps,
+            stars: activeStars,
+            bots: botsData,
+            projectiles: activeProjectiles,
             worldSize: { width: WORLD_WIDTH, height: WORLD_HEIGHT }
         };
     }
@@ -2250,7 +2439,7 @@ export class Game {
             this.ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
             
             // Outer glow for border
-            this.ctx.shadowBlur = this.isMobile || this.quality === 'low' ? 0 : 25;
+            this.ctx.shadowBlur = this.isMobile ? 0 : 25;
             this.ctx.shadowColor = `hsla(${hue}, ${saturation}%, 50%, 0.6)`;
             this.ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
             this.ctx.restore();
@@ -2313,7 +2502,7 @@ export class Game {
             const margin = 200;
             const x = margin + Math.random() * (WORLD_WIDTH - margin * 2);
             const y = margin + Math.random() * (WORLD_HEIGHT - margin * 2);
-            const types: ('shield' | 'rapid' | 'speed' | 'triple')[] = ['shield', 'rapid', 'speed', 'triple'];
+            const types: ('shield' | 'rapid' | 'speed' | 'triple' | 'bomb' | 'magnet')[] = ['shield', 'rapid', 'speed', 'triple', 'bomb', 'magnet'];
             const type = types[Math.floor(Math.random() * types.length)];
             p.init(x, y, type);
         }
@@ -2338,10 +2527,57 @@ export class Game {
         this.portals.push(p1, p2);
     }
 
-    private applyPowerUp(type: 'shield' | 'rapid' | 'speed' | 'triple') {
-        const duration = 10000; // 10 seconds
-        triggerGameSfx('collect');
-        this.player.powerUps[type] = duration;
+    applyPowerUp(type: 'shield' | 'rapid' | 'speed' | 'triple' | 'bomb' | 'magnet') {
+        triggerGameSfx('powerup');
+        if (type === 'bomb') {
+            this.detonateBomb();
+        } else if (type === 'magnet') {
+            this.player.powerUps.magnet = 10000; // 10 seconds
+        } else {
+            const duration = 10000; // 10 seconds
+            this.player.powerUps[type] = duration;
+        }
+        
+        if (this.onPowerUpCollected) {
+            this.onPowerUpCollected(type);
+        }
+    }
+
+    private detonateBomb() {
+        this.shake.shake(30);
+        this.flash.trigger(0.5, '#ff0055');
+        this.spawnShockwave(this.player.pos.x, this.player.pos.y, 500, '#ff0055');
+        this.spawnParticles(this.player.pos.x, this.player.pos.y, '#ff0055', 80, 8);
+        triggerGameSfx('explosion');
+        
+        // Damage/Kill bots in radius
+        const bombRadius = 500;
+        this.bots.forEach(bot => {
+            if (!bot.isDead) {
+                const dx = bot.pos.x - this.player.pos.x;
+                const dy = bot.pos.y - this.player.pos.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq < bombRadius * bombRadius) {
+                    const dmg = bot.type === 'super_boss' ? 50 : bot.type === 'boss' ? 20 : 5;
+                    bot.health -= dmg;
+                    bot.hitTimer = 150;
+                    this.spawnParticles(bot.pos.x, bot.pos.y, bot.color, 15, 3);
+                    if (bot.health <= 0) {
+                        bot.isDead = true;
+                        this.spawnParticles(bot.pos.x, bot.pos.y, bot.color, 40, 5);
+                        this.spawnShockwave(bot.pos.x, bot.pos.y, 100, bot.color);
+                        if (this.onBotKilled) this.onBotKilled(bot.type);
+                        
+                        // Add level progress
+                        this.kills++;
+                        this.totalKills++;
+                        if (this.kills >= this.killsToNextLevel) {
+                            this.prepareNextLevel();
+                        }
+                    }
+                }
+            }
+        });
     }
 
     private teleportPlayer(target: Point) {
@@ -2354,6 +2590,101 @@ export class Game {
         this.shake.shake(20);
         this.flash.trigger(0.4, '#ffffff');
         triggerGameSfx('powerup'); // Use powerup sound for teleport for now
+    }
+
+    startInGameQuestion(q: any) {
+        this.activeQuestion = q;
+        this.activeOrbs = [];
+        
+        // Spawn 4 orbs around the player (at a safe radius, say 280px)
+        const angles = [0, Math.PI / 2, Math.PI, Math.PI * 3 / 2];
+        angles.sort(() => Math.random() - 0.5); // Shuffle angles
+        
+        q.options.forEach((opt: any, idx: number) => {
+            const isCorrect = (opt === q.answer);
+            const angle = angles[idx];
+            const dist = 260 + Math.random() * 80;
+            const x = this.player.pos.x + Math.cos(angle) * dist;
+            const y = this.player.pos.y + Math.sin(angle) * dist;
+            
+            const cx = Math.max(100, Math.min(WORLD_WIDTH - 100, x));
+            const cy = Math.max(100, Math.min(WORLD_HEIGHT - 100, y));
+            
+            const colors = ['#00f2ff', '#bc13fe', '#ffea00', '#ff0055'];
+            const color = colors[idx % colors.length];
+            
+            this.activeOrbs.push(new AnswerOrb(cx, cy, String(opt), isCorrect, color));
+        });
+        
+        const skin = SKINS.find(s => s.id === this.player.skinId);
+        const multiplier = (skin && skin.responseTimeMultiplier) ? skin.responseTimeMultiplier : 1;
+        const baseTime = q.difficulty === 'hard' ? 12 : q.difficulty === 'medium' ? 10 : 8;
+        this.questionTimeLeft = baseTime * multiplier * 1000; // ms
+        
+        if (this.onInGameQuestionStart) {
+            this.onInGameQuestionStart(q, baseTime * multiplier);
+        }
+    }
+
+    handleOrbCollision(orb: AnswerOrb) {
+        if (!this.activeQuestion) return;
+        const q = this.activeQuestion;
+        
+        if (orb.isCorrect) {
+            this.activeQuestion = null;
+            this.activeOrbs = [];
+            
+            this.spawnParticles(orb.pos.x, orb.pos.y, '#00ff88', 40, 6);
+            this.spawnShockwave(orb.pos.x, orb.pos.y, 200, '#00ff88');
+            this.shake.shake(10);
+            triggerGameSfx('correct');
+            
+            if (this.onInGameAnswerResult) {
+                this.onInGameAnswerResult(true, q, false);
+            }
+        } else {
+            orb.isDead = true;
+            this.spawnParticles(orb.pos.x, orb.pos.y, '#ff0055', 30, 5);
+            this.shake.shake(12);
+            triggerGameSfx('wrong');
+            
+            // In Coop mode, wrong answers don't hurt the player
+            if (!this.isCoop) {
+                if (this.player.powerUps.shield > 0) {
+                    this.player.powerUps.shield = 0;
+                } else {
+                    this.player.lives = Math.max(0, this.player.lives - 1);
+                    this.flash.trigger(0.3, '#ff0000');
+                    this.shake.shake(15);
+                }
+            }
+            
+            if (this.onInGameAnswerResult) {
+                this.onInGameAnswerResult(false, q, false);
+            }
+        }
+    }
+
+    handleOrbTimeout() {
+        if (!this.activeQuestion) return;
+        const q = this.activeQuestion;
+        this.activeQuestion = null;
+        this.activeOrbs = [];
+        
+        if (!this.isCoop) {
+            if (this.player.powerUps.shield > 0) {
+                this.player.powerUps.shield = 0;
+            } else {
+                this.player.lives = Math.max(0, this.player.lives - 1);
+                this.flash.trigger(0.4, '#ff0000');
+                this.shake.shake(20);
+            }
+        }
+        triggerGameSfx('wrong');
+        
+        if (this.onInGameAnswerResult) {
+            this.onInGameAnswerResult(false, q, true);
+        }
     }
     private spawnParticles(x: number, y: number, color: string, count: number = 10, speed: number = 2, glow: boolean = true) {
         if (this.quality === 'low' && count > 5) count = 5;
@@ -2756,6 +3087,19 @@ export class Game {
         this.powerUps.forEach(p => {
             if (p.active) {
                 p.update();
+                
+                // Magnet pull for power-ups
+                if (this.player.powerUps.magnet > 0) {
+                    const dx = this.player.pos.x - p.pos.x;
+                    const dy = this.player.pos.y - p.pos.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 400 && dist > 10) {
+                        const pullSpeed = (400 - dist) * 0.08;
+                        p.pos.x += (dx / dist) * pullSpeed;
+                        p.pos.y += (dy / dist) * pullSpeed;
+                    }
+                }
+                
                 // Collision with player
                 const dx = this.player.pos.x - p.pos.x;
                 const dy = this.player.pos.y - p.pos.y;
@@ -2776,7 +3120,8 @@ export class Game {
 
         // Shooting logic
         const shootInterval = this.player.powerUps.rapid > 0 ? 100 : 200;
-        if (this.isShooting && this.player.ammo > 0 && this.player.status === 'alive') {
+        const hasAmmo = this.isCoop || this.player.ammo > 0;
+        if (this.isShooting && hasAmmo && this.player.status === 'alive') {
             this.shootTimer += dt;
             if (this.shootTimer >= shootInterval) {
                 // Mobile: Use player's current angle which follows the joystick/aim indicator
@@ -2799,7 +3144,7 @@ export class Game {
                     spawnProjectile(angle + 0.2);
                 }
 
-                this.player.ammo--;
+                if (!this.isCoop) this.player.ammo--;
                 if (this.quality === 'high') this.shake.shake(2);
                 if (this.isMobile && window.navigator.vibrate) window.navigator.vibrate(10);
                 
@@ -2816,6 +3161,40 @@ export class Game {
         // Update Particles
         this.pool.update(dt);
         this.hitMarkers.forEach(hm => hm.update(dt));
+
+        // Update active answer orbs & question time
+        if (this.activeQuestion) {
+            this.questionTimeLeft -= dt;
+            if (this.questionTimeLeft <= 0) {
+                this.handleOrbTimeout();
+            } else {
+                this.activeOrbs.forEach(orb => {
+                    orb.update({ width: WORLD_WIDTH, height: WORLD_HEIGHT }, dt);
+                    
+                    // Magnet pull on active orbs
+                    if (this.player.powerUps.magnet > 0) {
+                        const dx = this.player.pos.x - orb.pos.x;
+                        const dy = this.player.pos.y - orb.pos.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 400 && dist > 10) {
+                            const pullSpeed = (400 - dist) * 0.08;
+                            orb.vel.x += (dx / dist) * pullSpeed * 0.1;
+                            orb.vel.y += (dy / dist) * pullSpeed * 0.1;
+                        }
+                    }
+                    
+                    // Collision with player
+                    const dx = this.player.pos.x - orb.pos.x;
+                    const dy = this.player.pos.y - orb.pos.y;
+                    const distSq = dx * dx + dy * dy;
+                    const minDist = this.player.radius + orb.radius;
+                    if (distSq < minDist * minDist) {
+                        this.handleOrbCollision(orb);
+                    }
+                });
+                this.activeOrbs = this.activeOrbs.filter(o => !o.isDead);
+            }
+        }
 
         // Performance: Optimized Spatial Collisions
         this.checkSpatialCollisions(dt);
@@ -2871,7 +3250,6 @@ export class Game {
                 const minDist = (playerR + star.radius) * (this.isMobile ? 1.3 : 1.15);
                 if (distSq < minDist * minDist) {
                     star.isDead = true;
-                    this.paused = true; // Instant pause for question
                     this.spawnParticles(star.pos.x, star.pos.y, star.color, 45, 6);
                     this.shake.shake(6);
                     this.flash.trigger(0.2, star.color);
@@ -2917,9 +3295,22 @@ export class Game {
             }
         }
 
-        // Stars' pulse animation (consolidated - was a duplicate collision block)
+        // Stars' pulse animation & magnet pull
         for (let i = 0; i < this.stars.length; i++) {
-            if (!this.stars[i].isDead) this.stars[i].update();
+            const star = this.stars[i];
+            if (!star.isDead) {
+                star.update();
+                if (this.player.powerUps.magnet > 0) {
+                    const dx = playerX - star.pos.x;
+                    const dy = playerY - star.pos.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 400 && dist > 10) {
+                        const pullSpeed = (400 - dist) * 0.08;
+                        star.pos.x += (dx / dist) * pullSpeed;
+                        star.pos.y += (dy / dist) * pullSpeed;
+                    }
+                }
+            }
         }
     }
 
@@ -2928,9 +3319,16 @@ export class Game {
         const isPlayer = entity === this.player;
         
         if (isPlayer) {
+            // In Coop mode, projectiles don't damage players
+            if (this.isCoop) {
+                this.spawnParticles(p.pos.x, p.pos.y, '#00ff88', 8, 2);
+                p.active = false;
+                return;
+            }
             if (this.player.powerUps.shield > 0) {
                 this.spawnParticles(p.pos.x, p.pos.y, '#00f2ff', 15, 3);
                 this.spawnHitMarker(p.pos.x, p.pos.y, '#00f2ff');
+                triggerGameSfx('hit');
             } else {
                 this.spawnParticles(p.pos.x, p.pos.y, this.player.color, 20, 4);
                 this.shake.shake(12);
@@ -2980,12 +3378,25 @@ export class Game {
                 }
             }
         } else {
-            // Remote Player
+            // Remote Player hit - report to hit/kill tracking
             const remote = entity as any; // RemotePlayer
+            
+            // In Coop mode, projectiles don't damage other players
+            if (this.isCoop) {
+                this.spawnParticles(p.pos.x, p.pos.y, '#00ff88', 8, 2);
+                p.active = false;
+                return;
+            }
+            
             remote.hitTimer = 200;
             this.spawnParticles(p.pos.x, p.pos.y, remote.color, 15, 3);
             this.spawnHitMarker(p.pos.x, p.pos.y, '#ffffff');
             this.shake.shake(2);
+            
+            // Notify the game that we hit a remote player (for kill feed tracking)
+            if (this.isMultiplayer && p.owner === 'player' && this.onPlayerHit) {
+                this.onPlayerHit(remote.uid || 'unknown', 1, (this.player as any).uid || '');
+            }
         }
     }
 
@@ -3034,6 +3445,14 @@ export class Game {
                     Lighting.drawGlow(this.ctx, s.pos.x, s.pos.y, 60, s.color, 0.1);
                 }
             });
+
+            // Glow for active orbs
+            this.activeOrbs.forEach(orb => {
+                if (!orb.isDead && orb.pos.x > viewport.x - glowPadding && orb.pos.x < viewport.x + viewport.w + glowPadding &&
+                    orb.pos.y > viewport.y - glowPadding && orb.pos.y < viewport.y + viewport.h + glowPadding) {
+                    Lighting.drawGlow(this.ctx, orb.pos.x, orb.pos.y, orb.radius * 2, orb.color, 0.2);
+                }
+            });
         }
 
         this.shockwaves.forEach(sw => {
@@ -3062,6 +3481,13 @@ export class Game {
             if (!s.isDead && s.pos.x > viewport.x - drawPadding && s.pos.x < viewport.x + viewport.w + drawPadding &&
                 s.pos.y > viewport.y - drawPadding && s.pos.y < viewport.y + viewport.h + drawPadding) {
                 s.draw(this.ctx, this.quality);
+            }
+        });
+
+        this.activeOrbs.forEach(orb => {
+            if (!orb.isDead && orb.pos.x > viewport.x - drawPadding && orb.pos.x < viewport.x + viewport.w + drawPadding &&
+                orb.pos.y > viewport.y - drawPadding && orb.pos.y < viewport.y + viewport.h + drawPadding) {
+                orb.draw(this.ctx, this.quality);
             }
         });
 

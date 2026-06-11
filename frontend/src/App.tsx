@@ -25,6 +25,7 @@ import {
 import firebaseConfig from '../firebase-applet-config.json';
 import { QuestionEngine, Question } from './game/questionEngine';
 import { LoadingScreen } from './components/LoadingScreen';
+import { MatchIntro } from './components/MatchIntro';
 
 // Lazy loaded components for better performance
 // Usa lazyImport() em vez de React.lazy() direto para ganhar
@@ -603,12 +604,13 @@ const GameHUD = React.memo<GameHUDProps>(({
                 className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 shadow-lg ${
                   type === 'shield' ? 'bg-blue-500/20 border-blue-400 text-blue-400' :
                   type === 'rapid' ? 'bg-orange-500/20 border-orange-400 text-orange-400' :
-                  type === 'speed' ? 'bg-green-500/20 border-green-400 text-green-400' :
-                  'bg-purple-500/20 border-purple-400 text-purple-400'
+                  type === 'speed' ? 'bg-[#bc13fe]/20 border-[#bc13fe] text-[#bc13fe]' :
+                  type === 'magnet' ? 'bg-green-500/20 border-green-400 text-green-400' :
+                  'bg-red-500/20 border-red-400 text-red-400'
                 }`}
               >
                 <span className="font-black text-xs uppercase tracking-tighter">
-                  {type === 'shield' ? 'S' : type === 'rapid' ? 'R' : type === 'speed' ? 'V' : 'T'}
+                  {type === 'shield' ? 'S' : type === 'rapid' ? 'R' : type === 'speed' ? 'V' : type === 'magnet' ? 'M' : 'T'}
                 </span>
               </motion.div>
             ))}
@@ -618,8 +620,20 @@ const GameHUD = React.memo<GameHUDProps>(({
 
       <canvas ref={canvasRef} style={{ touchAction: 'none' }} />
 
+      <AnimatePresence>
+        {showMatchIntro && (
+          <MatchIntro
+            isMultiplayer={matchIntroMultiplayer}
+            isMobile={isTouch}
+            isLandscape={isLandscape}
+            onDismiss={handleMatchIntroDismiss}
+            loadingProgress={loadingProgress}
+          />
+        )}
+      </AnimatePresence>
+
       <React.Suspense fallback={null}>
-        <MiniMap game={gameRef.current} visible={!!room} />
+        <MiniMap game={gameRef.current} visible={!!room && !showMatchIntro} />
       </React.Suspense>
 
       {isTouch && !isCustomizingHUD && (
@@ -1079,6 +1093,8 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showMatchIntro, setShowMatchIntro] = useState(false);
+  const [matchIntroMultiplayer, setMatchIntroMultiplayer] = useState(false);
   const [paymentReturnToast, setPaymentReturnToast] = useState<{ type: 'success' | 'failed' | null }>({ type: null });
   const [playtimeWarning, setPlaytimeWarning] = useState<null | '5min' | '1min'>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(1800);
@@ -1139,7 +1155,7 @@ export default function App() {
   const [room, setRoom] = useState<any>(null);
   const [rooms, setRooms] = useState<any[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
-  const [lobbyFilterMode, setLobbyFilterMode] = useState<'all' | 'ffa' | 'teams'>('all');
+  const [lobbyFilterMode, setLobbyFilterMode] = useState<'all' | 'ffa' | 'teams' | 'coop'>('all');
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [matchmakingStatus, setMatchmakingStatus] = useState<string>('');
   const [playerData, setPlayerData] = useState<any>(null);
@@ -1184,6 +1200,7 @@ export default function App() {
   const lastChatCountRef = useRef<number>(0);
 
   const [isOnline, setIsOnline] = useState(true);
+  const [isGuestMode, setIsGuestMode] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1381,7 +1398,7 @@ export default function App() {
   // When user returns to the tab, refresh isVIP (webhook may have fired meanwhile)
   useEffect(() => {
     const onFocus = async () => {
-      if (user && isOnline) {
+      if (user && isOnline && !isGuestMode) {
         try {
           const snap = await getDoc(doc(firestore, 'players', user.uid));
           if (snap.exists()) {
@@ -1392,7 +1409,7 @@ export default function App() {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [user, isOnline]);
+  }, [user, isOnline, isGuestMode]);
 
   // Auto-dismiss payment return toast
   useEffect(() => {
@@ -1410,14 +1427,14 @@ export default function App() {
     }
     
     // Persist to Firebase if logged in and online
-    if (user && isOnline) {
+    if (user && isOnline && !isGuestMode) {
       const playerRef = doc(firestore, 'players', user.uid);
       updateDoc(playerRef, { 
         quality: quality,
         lastUpdate: fsServerTimestamp()
       }).catch(error => handleDatabaseError(error, OperationType.UPDATE, `players/${user.uid}`));
     }
-  }, [quality, user]);
+  }, [quality, user, isGuestMode]);
 
   useEffect(() => {
     if (gameRef.current) {
@@ -1426,18 +1443,19 @@ export default function App() {
     localStorage.setItem('selectedSkinId', currentSkinId.toString());
     
     // Persist to Firebase if logged in and online
-    if (user && isOnline) {
+    if (user && isOnline && !isGuestMode) {
       const playerRef = doc(firestore, 'players', user.uid);
       updateDoc(playerRef, { 
         selectedSkinId: currentSkinId,
         lastUpdate: fsServerTimestamp()
       }).catch(error => handleDatabaseError(error, OperationType.UPDATE, `players/${user.uid}`));
     }
-  }, [currentSkinId, user]);
+  }, [currentSkinId, user, isGuestMode]);
 
   // Firebase Auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (isGuestMode) return;
       if (u) {
         setUser(u);
         if (!isOnline) {
@@ -1683,7 +1701,7 @@ export default function App() {
 
   // Notification listener
   useEffect(() => {
-    if (!user) return;
+    if (!user || isGuestMode) return;
     const notificationsRef = ref(db, `notifications/${user.uid}`);
     const unsubscribe = onValue(notificationsRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -1708,7 +1726,7 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, isGuestMode]);
 
   // Request notification permission
   const requestNotificationPermission = async () => {
@@ -1723,7 +1741,7 @@ export default function App() {
 
   // Leaderboard listener
   useEffect(() => {
-    if (!user) return;
+    if (!user || isGuestMode) return;
     const playersRef = collection(firestore, 'players');
     const leaderboardQuery = fsQuery(playersRef, fsOrderBy('trophies', 'desc'), fsLimit(10));
     
@@ -1753,11 +1771,11 @@ export default function App() {
       handleDatabaseError(error, OperationType.LIST, 'players');
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, isGuestMode]);
 
   // Real-time Player Data Sync listener
   useEffect(() => {
-    if (!user) return;
+    if (!user || isGuestMode) return;
     const playerRef = doc(firestore, 'players', user.uid);
     const unsubscribe = onSnapshot(playerRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -1773,11 +1791,11 @@ export default function App() {
       handleDatabaseError(error, OperationType.GET, `players/${user.uid}`);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, isGuestMode]);
 
   // Lobby rooms listener (Firestore)
   useEffect(() => {
-    if (gameState !== 'lobby' || !user) {
+    if (gameState !== 'lobby' || !user || isGuestMode) {
       if (gameState !== 'lobby') setRooms([]); // Clear rooms when not in lobby
       return;
     }
@@ -1805,18 +1823,27 @@ export default function App() {
     }
     
     const unsubscribe = onSnapshot(roomsQuery, (snapshot) => {
-      const roomsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any),
-        playerIds: Object.keys((doc.data() as any).players || {})
-      }));
+      const now = Date.now();
+      const roomsData = snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        // Auto-cleanup stale rooms (> 15 minutes waiting)
+        const createdAt = data.createdAt?.toMillis?.() || 0;
+        if (data.status === 'waiting' && createdAt > 0 && now - createdAt > 15 * 60 * 1000) {
+          deleteDoc(doc.ref).catch(() => {});
+          return null;
+        }
+        return {
+          id: doc.id,
+          ...data,
+          playerIds: Object.keys(data.players || {})
+        };
+      }).filter(Boolean);
       
       const uniqueRooms = deduplicateItems(roomsData, (r: any) => `sync-room-${r.id}`, 'RoomsSync');
       setRooms(uniqueRooms);
       setLoadingRooms(false);
     }, (error) => {
       setLoadingRooms(false);
-      // Index missing error handling (Expert level log)
       if ((error as any).code === 'failed-precondition') {
         console.warn("Lobby Error: This query requires a composite index. Check firestore.indexes.json for the required config.");
       }
@@ -1824,7 +1851,7 @@ export default function App() {
     });
     
     return () => unsubscribe();
-  }, [gameState, user, lobbyFilterMode]);
+  }, [gameState, user, lobbyFilterMode, isGuestMode]);
 
   // Helper for mobile feedback
   const triggerHaptic = async () => {
@@ -1895,7 +1922,7 @@ export default function App() {
 
   // Global Chat listener
   useEffect(() => {
-    if (!user) return;
+    if (!user || isGuestMode) return;
     const chatRef = collection(firestore, 'global_chat');
     const chatQuery = fsQuery(chatRef, fsOrderBy('timestamp', 'desc'), fsLimit(50));
     
@@ -1918,11 +1945,11 @@ export default function App() {
     });
     
     return () => unsubscribe();
-  }, [user]); // Removed showGlobalChat for performance (avoid resubscribing)
+  }, [user, isGuestMode]); // Removed showGlobalChat for performance (avoid resubscribing)
 
   // Room waiting listener (Firestore)
   useEffect(() => {
-    if (gameState !== 'lobby' || !user || !room) return;
+    if (gameState !== 'lobby' || !user || !room || isGuestMode) return;
     
     const roomDocRef = doc(firestore, 'rooms', room.id);
     const unsubscribe = onSnapshot(roomDocRef, (snapshot) => {
@@ -1935,8 +1962,12 @@ export default function App() {
       const newRoom = { ...data, id: room.id, playerIds: Object.keys(players) };
       setRoom(newRoom);
       
-      if (data.status === 'playing') {
-        setGameState('playing');
+      if (data.status === 'playing' && gameState === 'lobby') {
+        // Show match intro first, then transition to game
+        setMatchIntroMultiplayer(true);
+        setShowMatchIntro(true);
+        setLoadingProgress(0);
+        
         // Initial RTDB gameplay data sync
         const playerGameplayRef = ref(db, `rooms/${room.id}/players/${user.uid}`);
         update(playerGameplayRef, {
@@ -1947,14 +1978,23 @@ export default function App() {
           ammo: 2,
           pos: { x: Math.random() * 800 + 100, y: Math.random() * 600 + 100 }
         });
+        
+        // Fake loading progression for multiplayer
+        const doProgress = async () => {
+          for (let p = 0; p <= 100; p += 4) {
+            await new Promise(r => setTimeout(r, 70));
+            setLoadingProgress(prev => Math.min(100, prev + 4));
+          }
+        };
+        doProgress();
       }
     });
     
     return () => unsubscribe();
-  }, [gameState, user, room?.id, nickname]);
+  }, [gameState, user, room?.id, nickname, isGuestMode]);
 
   const dismissNotification = (id: string) => {
-    if (!user) return;
+    if (!user || isGuestMode) return;
     remove(ref(db, `notifications/${user.uid}/${id}`)).catch(err => console.error('Failed to dismiss notification:', err));
   };
 
@@ -2005,7 +2045,7 @@ export default function App() {
   );
 
   const handleChallenge = (targetUid: string, targetName: string) => {
-    if (!user || !db || user.uid === targetUid) return;
+    if (!user || isGuestMode || !db || user.uid === targetUid) return;
     
     const notificationRef = push(ref(db, `notifications/${targetUid}`));
     set(notificationRef, {
@@ -2038,9 +2078,36 @@ export default function App() {
     }
   };
 
+  const handleGuestLogin = () => {
+    setIsGuestMode(true);
+    setUser({
+      uid: 'guest-player',
+      email: 'guest@tryhardacademy.com.br',
+      displayName: 'Tryhard Guest',
+    });
+    const guestData = {
+      uid: 'guest-player',
+      nickname: 'Tryhard Guest',
+      trophies: 100,
+      level: 1,
+      role: 'player',
+      isVIP: false,
+      playtimeToday: 0,
+      lastPlayedDate: new Date().toISOString().split('T')[0],
+    };
+    setPlayerData(guestData);
+    setNickname(guestData.nickname);
+    setTrophies(100);
+    setCurrentLevel(1);
+    setGameState('menu');
+  };
+
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      if (user?.uid !== 'guest-player') {
+        await signOut(auth);
+      }
+      setIsGuestMode(false);
       setGameState('auth');
       setUser(null);
       setNickname('');
@@ -2053,7 +2120,7 @@ export default function App() {
 
   // Persist skin selection
   useEffect(() => {
-    if (user && currentSkinId && isOnline) {
+    if (user && currentSkinId && isOnline && !isGuestMode) {
        const playerRef = doc(firestore, 'players', user.uid);
        updateDoc(playerRef, { selectedSkinId: currentSkinId }).catch(() => {});
        
@@ -2061,13 +2128,12 @@ export default function App() {
        const rtRef = ref(db, `players/${user.uid}`);
        update(rtRef, { selectedSkinId: currentSkinId }).catch(() => {});
     }
-  }, [currentSkinId, user, isOnline]);
+  }, [currentSkinId, user, isOnline, isGuestMode]);
 
   const awardTrophies = useCallback(async (amount: number) => {
-    if (!user || !isOnline) {
-      if (!isOnline) {
+    if (!user || !isOnline || isGuestMode) {
+      if (!isOnline || isGuestMode) {
         setTrophies(prev => prev + amount);
-        setPlayerData((prev: any) => ({ ...prev, trophies: (prev?.trophies || 0) + amount }));
       }
       return;
     }
@@ -2111,7 +2177,11 @@ export default function App() {
         ammo: player.ammo || 0,
         nickname: nickname || 'Player',
         trophies: trophies || 0,
-        skinId: player.skinId
+        skinId: player.skinId,
+        color: player.color,
+        shield: player.powerUps?.shield || 0,
+        rapid: player.powerUps?.rapid || 0,
+        speed: player.powerUps?.speed || 0
       };
 
       // Anti-spam: Adaptive sync rate
@@ -2126,17 +2196,18 @@ export default function App() {
         Math.abs(currentState.angle - lastState.angle) > 0.15 ||
         currentState.lives !== lastState.lives ||
         currentState.ammo !== lastState.ammo ||
-        currentState.skinId !== (lastState as any).skinId;
+        currentState.skinId !== (lastState as any).skinId ||
+        currentState.shield !== (lastState as any).shield ||
+        currentState.color !== (lastState as any).color;
 
       const timeSinceLastSync = now - lastSyncTimeRef.current;
       
       // Idle: sync every 500ms
       // Moving: sync every 60ms or on significant change (min 30ms)
       const syncThreshold = isMoving ? 60 : 500;
-      const minSyncInterval = 30; // Up to 33 times per second for high precision
+      const minSyncInterval = 30;
 
       if ((significantChange && timeSinceLastSync > minSyncInterval) || timeSinceLastSync > syncThreshold) {
-        const syncStart = Date.now();
         lastSyncTimeRef.current = now;
         lastSentStateRef.current = currentState as any;
         
@@ -2166,6 +2237,7 @@ export default function App() {
         if (p.rapid > 0) active.push('rapid');
         if (p.speed > 0) active.push('speed');
         if (p.triple > 0) active.push('triple');
+        if (p.magnet > 0) active.push('magnet');
       }
       setActivePowerUps(active);
 
@@ -2230,6 +2302,9 @@ export default function App() {
   // Multi-user competitive match state monitor
   useEffect(() => {
     if (gameState !== 'playing' || !user || !room) return;
+    
+    // Coop mode has no winners or losers
+    if (room.mode === 'coop') return;
     
     // FFA Win Condition: Only 1 alive player remains
     if (room.mode === 'ffa') {
@@ -2328,41 +2403,35 @@ export default function App() {
       const currentRoom = roomRef.current;
       const currentUser = userRef.current;
       if (game.isMultiplayer && currentRoom && currentUser) {
-        // Only the victim is responsible for updating their own state
+        // Victim logic: the local player was hit
         if (victimId === currentUser.uid) {
           const newLives = Math.max(0, game.player.lives - (damage || 1));
           
-          // Only update if lives actually changed
           if (newLives !== game.player.lives) {
             game.player.lives = newLives;
             if (newLives > 0) audioManager.playSound('hit');
             
-            // Sync lives to Firebase
             const victimRef = ref(db, `rooms/${currentRoom.id}/players/${victimId}`);
             update(victimRef, { lives: newLives }).catch(() => {});
             
-            // If died, report kill and award trophies
             if (newLives <= 0) {
               game.gameOver = true;
               setShowGameOver(true);
               audioManager.playSound('death');
               
-              // Sync status to RTDB (Authoritative for engine)
               const playerRtRef = ref(db, `rooms/${currentRoom.id}/players/${victimId}`);
               runTransaction(playerRtRef, (p) => {
                 if (p) p.status = 'dead';
                 return p;
               });
 
-              // Sync status to Firestore for match termination logic
               const roomDocRef = doc(firestore, 'rooms', currentRoom.id);
               updateDoc(roomDocRef, {
                 [`players.${victimId}.status`]: 'dead'
               });
               
-              // Report kill
               const victimName = nicknameRef.current || 'Unknown';
-              const killerName = game.remotePlayers.get(killerId || '')?.nickname || (killerId === currentUser.uid ? victimName : 'Unknown');
+              const killerName = game.remotePlayers.get(killerId || '')?.nickname || 'Unknown';
               
               const killRef = ref(db, `rooms/${currentRoom.id}/kills`);
               push(killRef, {
@@ -2371,20 +2440,36 @@ export default function App() {
                 timestamp: serverTimestamp()
               });
               
-              // Award trophies to killer (+3)
               if (killerId && killerId !== currentUser.uid) {
-                // Award in current room (RTDB)
                 const killerRef = ref(db, `rooms/${currentRoom.id}/players/${killerId}`);
                 update(killerRef, { trophies: increment(3) });
-                
-                // Award globally in Firestore/RTDB if it's the current local player
-                // (Server-side/Authoritative killed notification would be better, but this works for client-auth)
-                if (killerId === currentUser.uid) {
-                  awardTrophies(3);
-                }
               }
             }
           }
+        }
+        
+        // Killer logic: the local player hit someone else
+        if (killerId === currentUser.uid && victimId !== currentUser.uid) {
+          const victimName = game.remotePlayers.get(victimId)?.nickname || 'Unknown';
+          const killerName = nicknameRef.current || 'Unknown';
+          
+          // Add to local kill feed
+          const killData = {
+            id: `kill-${Date.now()}`,
+            killer: killerName,
+            victim: victimName,
+            time: Date.now()
+          };
+          setKillFeed(prev => [killData, ...prev].slice(0, 5));
+          setTimeout(() => {
+            setKillFeed(prev => prev.filter(k => k.id !== killData.id));
+          }, 5000);
+          
+          // Increment local kills counter
+          game.kills = (game.kills || 0) + 1;
+          game.totalKills = (game.totalKills || 0) + 1;
+          
+          audioManager.playSound('hit');
         }
       }
     };
@@ -2417,7 +2502,8 @@ export default function App() {
           options: [3, 4, 5, 6],
           answer: 4,
           difficulty: 'easy',
-          explanation: 'Básico!'
+          explanation: 'Básico!',
+          subject: 'math'
         };
       }
 
@@ -2425,19 +2511,21 @@ export default function App() {
       const multiplier = (skin && skin.responseTimeMultiplier) ? skin.responseTimeMultiplier : 1;
       const baseTime = q.difficulty === 'hard' ? 10 : q.difficulty === 'medium' ? 8 : 6;
 
-      setCurrentQuestion(q);
-      setSelectedOption(null);
-      setFeedback(null);
-      setTimeLeft(baseTime * multiplier);
-      setShowModal(true);
-      
-      // Pause game in offline mode
       if (!game.isMultiplayer) {
-        game.paused = true;
-      } else if (index !== undefined && index !== -1) {
-        // Sync star collection in multiplayer
-        const starRef = ref(db, `rooms/${currentRoom.id}/stars/${index}`);
-        update(starRef, { active: false }).catch(() => {});
+        // Active challenge inside the match
+        game.startInGameQuestion(q);
+      } else {
+        // Fallback to modal in multiplayer
+        setCurrentQuestion(q);
+        setSelectedOption(null);
+        setFeedback(null);
+        setTimeLeft(baseTime * multiplier);
+        setShowModal(true);
+        
+        if (index !== undefined && index !== -1) {
+          const starRef = ref(db, `rooms/${currentRoom.id}/stars/${index}`);
+          update(starRef, { active: false }).catch(() => {});
+        }
       }
 
       // Update mission progress for stars
@@ -2454,6 +2542,58 @@ export default function App() {
           }
           return prev;
         });
+      }
+    };
+
+    game.onInGameQuestionStart = (q, timeLimit) => {
+      setCurrentQuestion(q);
+      setSelectedOption(null);
+      setFeedback(null);
+      setTimeLeft(timeLimit);
+    };
+
+    game.onInGameAnswerResult = (isCorrect, question, isTimeout) => {
+      if (isCorrect) {
+        setFeedback('correct');
+        setTimeout(() => setFeedback(null), 1500);
+
+        const diffBonus = question.difficulty === 'extreme' ? 15 : question.difficulty === 'hard' ? 10 : question.difficulty === 'medium' ? 5 : 2;
+        setTrophies(prev => prev + diffBonus);
+        awardTrophies(diffBonus);
+
+        const powerUpTypes = ['shield', 'rapid', 'speed', 'triple', 'bomb', 'magnet'];
+        const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+        game.applyPowerUp(randomType as any);
+
+        setStats(prev => {
+          const newKills = prev.kills + 1;
+          let newLevel = prev.level;
+          if (newKills >= prev.level * 3) {
+            newLevel++;
+            audioManager.playSound('level_up');
+            setShowLevelUp(true);
+            setTimeout(() => setShowLevelUp(false), 2000);
+          }
+          return { ...prev, kills: newKills, level: newLevel };
+        });
+
+        setCurrentQuestion(null);
+      } else {
+        setFeedback(isTimeout ? 'timeout' : 'wrong');
+        setTimeout(() => setFeedback(null), 1500);
+
+        setStats(prev => {
+          const newLives = Math.max(0, prev.lives - 1);
+          if (newLives <= 0) {
+            game.gameOver = true;
+            setShowGameOver(true);
+          }
+          return { ...prev, lives: newLives };
+        });
+
+        if (isTimeout || game.player.lives <= 0) {
+          setCurrentQuestion(null);
+        }
       }
     };
 
@@ -2540,6 +2680,7 @@ export default function App() {
 
     if (currentRoom && currentUser) {
       game.isMultiplayer = true;
+      game.isCoop = currentRoom.mode === 'coop';
       game.isHost = currentRoom.playerIds[0] === currentUser.uid;
 
       // Listen for local player lives from Firebase in multiplayer
@@ -2549,7 +2690,8 @@ export default function App() {
           const remoteLives = snapshot.val();
           if (game.player.lives !== remoteLives) {
             game.player.lives = remoteLives;
-            if (remoteLives <= 0 && !game.gameOver) {
+            // In Coop mode, no game over from losing lives
+            if (!game.isCoop && remoteLives <= 0 && !game.gameOver) {
               // Double check if game actually started to avoid instant defeat bug
               if (game.isRunning) {
                 game.gameOver = true;
@@ -2581,9 +2723,9 @@ export default function App() {
             // Update remote player data
             remote.updateFromRemote(data);
 
-            // Victory condition: If other player is dead
+            // Victory condition: If other player is dead (skipped for Coop)
             // Only check if game is running and we are not already in game over
-            if (game.isRunning && data.lives <= 0 && !game.gameOver) {
+            if (game.isRunning && !game.isCoop && data.lives <= 0 && !game.gameOver) {
               game.gameOver = true;
               game.paused = true;
               setIsLevel50Victory(false);
@@ -2607,8 +2749,8 @@ export default function App() {
         });
 
         // If we are in a match and an opponent left, and we are the only one left, we win
-        // Only trigger if game was already running to avoid lobby issues
-        if (game.isRunning && gameState === 'playing' && playerLeft && game.remotePlayers.size === 0 && !game.gameOver) {
+        // Only trigger if game was already running to avoid lobby issues (skipped for Coop)
+        if (game.isRunning && !game.isCoop && gameState === 'playing' && playerLeft && game.remotePlayers.size === 0 && !game.gameOver) {
           game.gameOver = true;
           game.paused = true;
           setIsLevel50Victory(false);
@@ -2827,9 +2969,10 @@ export default function App() {
     };
   }, [gameState]);
 
-  // Multiplayer Winner Detection
+  // Multiplayer Winner Detection (skipped for Coop mode)
   useEffect(() => {
     if (gameState !== 'playing' || !room || !user || !gameRef.current || !gameRef.current.isMultiplayer || gameRef.current.paused) return;
+    if (room.mode === 'coop') return; // No winners in coop mode
     
     const players = room.players || {};
     const playerIds = Object.keys(players);
@@ -2981,14 +3124,16 @@ export default function App() {
   const handleStartMultiplayerGame = async () => {
     if (!user || !room || room.hostId !== user.uid) return;
     
-    // Check if all players are ready and teams are balanced if in team mode
-    const players = room.players || {};
-    const playerIds = Object.keys(players);
-    const allReady = playerIds.every(pid => players[pid].ready || pid === user.uid);
-    
-    if (!allReady) {
-      alert("Todos os jogadores precisam estar prontos!");
-      return;
+    // Coop mode: no ready check needed, casual play
+    if (room.mode !== 'coop') {
+      const players = room.players || {};
+      const playerIds = Object.keys(players);
+      const allReady = playerIds.every(pid => players[pid].ready || pid === user.uid);
+      
+      if (!allReady) {
+        alert("Todos os jogadores precisam estar prontos!");
+        return;
+      }
     }
 
     setLoading(true);
@@ -3047,7 +3192,9 @@ export default function App() {
 
   const handleToggleMode = async () => {
     if (!user || !room || room.hostId !== user.uid) return;
-    const nextMode = room.mode === 'ffa' ? 'teams' : 'ffa';
+    const modes = ['ffa', 'teams', 'coop'];
+    const currentIdx = modes.indexOf(room.mode);
+    const nextMode = modes[(currentIdx + 1) % modes.length];
     try {
       const roomDocRef = doc(firestore, 'rooms', room.id);
       await updateDoc(roomDocRef, {
@@ -3106,7 +3253,7 @@ export default function App() {
       const newRoom = {
         status: 'waiting',
         hostId: user.uid,
-        mode: 'ffa',
+        mode: 'coop',
         createdAt: fsServerTimestamp(),
         playerCount: 1,
         players: {
@@ -3128,7 +3275,7 @@ export default function App() {
         playerCount: 1,
         status: 'waiting',
         hostId: user.uid,
-        mode: 'ffa',
+        mode: 'coop',
         createdAt: now
       });
       
@@ -3148,6 +3295,21 @@ export default function App() {
       handleDatabaseError(error, OperationType.CREATE, 'rooms');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuickJoin = () => {
+    if (rooms.length === 0) {
+      handleCreateRoom();
+      return;
+    }
+    // Sort by most players first, then join the fullest room
+    const sortedRooms = [...rooms].sort((a, b) => (b.playerIds?.length || 0) - (a.playerIds?.length || 0));
+    const targetRoom = sortedRooms[0];
+    if (targetRoom) {
+      handleJoinRoom(targetRoom.id);
+    } else {
+      handleCreateRoom();
     }
   };
 
@@ -3278,7 +3440,7 @@ export default function App() {
   // Centralized VIP checkout call (used by time-limit screen, menu and rotate prompt)
   const handleBuyVip = async () => {
     try {
-      const response = await fetch(import.meta.env.VITE_API_URL + '/api/checkout', {
+      const response = await fetch((import.meta as any).env.VITE_API_URL + '/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: user?.uid, email: user?.email })
@@ -3295,15 +3457,23 @@ export default function App() {
   };
 
   const handleStartGame = async () => {
-    // Unblock audio
     audioManager.init();
     audioManager.playBGM();
     
-    setRoom(null);
-    setGameState('playing');
-    setEngineState('playing');
+    // Show match intro with fake loading progress
+    setMatchIntroMultiplayer(false);
+    setShowMatchIntro(true);
+    setLoadingProgress(0);
     
-    // Attempt fullscreen immediately on user gesture
+    // Fake loading progress for singleplayer (game loads instantly)
+    for (let p = 0; p <= 100; p += 5) {
+      await new Promise(r => setTimeout(r, 80));
+      setLoadingProgress(p);
+    }
+    
+    setRoom(null);
+    // gameState will be set to 'playing' by handleMatchIntroDismiss
+    
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -3314,6 +3484,14 @@ export default function App() {
     setGameState('lobby');
     setRoom(null);
   };
+
+  const handleMatchIntroDismiss = useCallback(() => {
+    setShowMatchIntro(false);
+    setGameState('playing');
+    setEngineState('playing');
+    audioManager.init();
+    audioManager.playBGM();
+  }, []);
 
   const saveSettings = async () => {
     localStorage.setItem('quality', quality);
@@ -3470,6 +3648,23 @@ export default function App() {
     }
     return () => clearInterval(timer);
   }, [showModal, feedback, timeLeft]);
+
+  // Timer effect for In-Game active question (without modal)
+  useEffect(() => {
+    let timer: any;
+    if (currentQuestion && !showModal && !feedback && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            gameRef.current?.handleOrbTimeout();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [currentQuestion, showModal, feedback, timeLeft]);
 
   const handleJoystick = (clientX: number, clientY: number, basePos: { x: number; y: number }) => {
     if (!gameRef.current || !basePos) return;
@@ -3800,10 +3995,9 @@ export default function App() {
             >
               <div className="text-center mb-8">
                 <img 
-                  src="https://i.ibb.co/d0hdJ7xN/Chat-GPT-Image-6-de-jun-de-2026-13-05-06.png" 
+                  src="./logo.png" 
                   alt="Tryhard Academy Logo" 
                   className="w-24 h-24 mx-auto mb-4 object-contain drop-shadow-[0_0_15px_rgba(188,19,254,0.4)]"
-                  referrerPolicy="no-referrer"
                 />
                 <h1 className="text-3xl font-black italic text-white tracking-tighter mb-2">
                   TRYHARD <span className="text-[#bc13fe]">ACADEMY</span>
@@ -3849,9 +4043,17 @@ export default function App() {
                     <Users className="w-5 h-5 text-white animate-pulse" />
                     Entrar com o Google
                   </button>
+
+                  <button 
+                    onClick={handleGuestLogin}
+                    disabled={loading}
+                    className="w-full py-4 bg-[#0a0a0a] border border-[#bc13fe]/30 hover:border-[#bc13fe]/70 hover:bg-[#bc13fe]/5 text-white rounded-2xl font-black uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                  >
+                    Entrar em Modo de Teste
+                  </button>
                   
                   <p className="text-[10px] text-white/30 uppercase tracking-widest text-center">
-                    Acesso exclusivo via login Google
+                    Acesso exclusivo via login Google ou Modo de Teste
                   </p>
                 </div>
               )}
@@ -4201,6 +4403,7 @@ export default function App() {
             if (gameRef.current) {
               gameRef.current.stop();
             }
+            setShowMatchIntro(false);
             setGameState('menu');
             setRoom(null);
           }}
@@ -4208,6 +4411,47 @@ export default function App() {
           canvasRef={canvasRef}
         />
       )}
+
+      <AnimatePresence>
+        {gameState === 'playing' && currentQuestion && !showModal && (
+          <motion.div 
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[80] w-full max-w-xl px-4 pointer-events-none"
+          >
+            <div className="bg-black/90 backdrop-blur-xl border-2 border-cyan-500/30 rounded-3xl p-5 shadow-[0_0_40px_rgba(0,242,255,0.3)] flex flex-col gap-3 items-center text-center relative overflow-hidden">
+              <div className="absolute -inset-20 bg-cyan-500/10 blur-[60px] rounded-full" />
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse" />
+              
+               <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono flex items-center gap-2 relative z-10">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                {room?.mode === 'coop' ? (
+                  <span className="text-green-400">MODO CO-OP — RESPONDA JUNTO COM O GRUPO!</span>
+                ) : (
+                  <span className="text-cyan-400">DESAFIO DE ARENA ATIVO - DESTRUA OU EVITE OS RESULTADOS INCORRETOS!</span>
+                )}
+              </div>
+              
+              <div className="text-xl md:text-2xl font-black text-white tracking-tight leading-tight relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                {currentQuestion.text}
+              </div>
+              
+              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/10 relative z-10">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-green-500"
+                  style={{ width: `${Math.min(100, (timeLeft / (currentQuestion.difficulty === 'hard' ? 12 : currentQuestion.difficulty === 'medium' ? 10 : 8)) * 100)}%` }}
+                  transition={{ type: 'spring', damping: 15 }}
+                />
+              </div>
+              
+              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest relative z-10">
+                Colete o Orb de Resposta correto e desvie dos orbs com as respostas erradas!
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showLevelUp && (
@@ -4255,7 +4499,7 @@ export default function App() {
                   {/* Expert Filter Logic */}
                   {!room && (
                     <div className="flex gap-2 mt-4">
-                      {['all', 'ffa', 'teams'].map((m) => (
+                      {['all', 'ffa', 'teams', 'coop'].map((m) => (
                         <button 
                           key={`filter-${m}`}
                           onClick={() => setLobbyFilterMode(m as any)}
@@ -4265,7 +4509,7 @@ export default function App() {
                             : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
                           }`}
                         >
-                          {m === 'all' ? 'TODAS' : m}
+                          {m === 'all' ? 'TODAS' : m === 'coop' ? 'CO-OP' : m.toUpperCase()}
                         </button>
                       ))}
                     </div>
@@ -4302,18 +4546,23 @@ export default function App() {
                           >
                             <Globe className="w-5 h-5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" />
                             <span className="text-white font-black uppercase italic tracking-tighter text-lg">
-                              {room.mode === 'ffa' ? 'FREE FOR ALL' : 'TEAM DEATHMATCH (2V2)'}
+                              {room.mode === 'ffa' ? 'FREE FOR ALL' : room.mode === 'teams' ? 'TEAM DEATHMATCH (2V2)' : 'SALA ABERTA (CO-OP)'}
                             </span>
                           </button>
                         ) : (
                           <div className="flex items-center gap-3 px-6 py-3 rounded-xl border border-white/5">
                             <Hash className="w-5 h-5 text-white/20" />
                             <span className="text-white/60 font-black uppercase italic tracking-tighter text-lg">
-                              {room.mode === 'ffa' ? 'FREE FOR ALL' : 'TEAM DEATHMATCH (2V2)'}
+                              {room.mode === 'ffa' ? 'FREE FOR ALL' : room.mode === 'teams' ? 'TEAM DEATHMATCH (2V2)' : 'SALA ABERTA (CO-OP)'}
                             </span>
                           </div>
                         )}
                       </div>
+                      {room.mode === 'coop' && (
+                        <div className="text-[10px] text-green-400/60 font-bold uppercase tracking-[0.2em] text-center py-2 px-4 bg-green-500/5 rounded-xl border border-green-500/10 w-full">
+                          🌱 Modo Livre — Sem vencedores nem perdedores. Apenas jogue e se divirta!
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
@@ -4335,7 +4584,11 @@ export default function App() {
                             </div>
 
                             <div className="flex gap-2">
-                              {room.mode === 'teams' ? (
+                              {room.mode === 'coop' ? (
+                                <div className="flex-1 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-[9px] font-black text-green-400 text-center uppercase tracking-widest">
+                                  CO-OP
+                                </div>
+                              ) : room.mode === 'teams' ? (
                                 <button
                                   disabled={!isMe}
                                   onClick={handleToggleTeam}
@@ -4351,7 +4604,7 @@ export default function App() {
                                 </div>
                               )}
                               
-                              {isMe && pid !== room.hostId && (
+                              {isMe && pid !== room.hostId && room.mode !== 'coop' && (
                                 <button
                                   onClick={handleToggleReady}
                                   className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
@@ -4404,13 +4657,13 @@ export default function App() {
 
                     <div className="flex gap-4 w-full pt-4">
                       {room.hostId === user.uid && (
-                        <button 
-                          onClick={() => beginGameWithRotationCheck(() => { handleStartMultiplayerGame(); requestLandscape(); })}
-                          disabled={loading || room.playerIds.length < 2}
-                          className="flex-1 bg-[#00f2ff] hover:bg-[#00d8e6] text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 disabled:opacity-50 disabled:grayscale shadow-[0_0_30px_rgba(0,242,255,0.4)]"
-                        >
-                          INICIAR COMBATE
-                        </button>
+                          <button 
+                            onClick={() => beginGameWithRotationCheck(() => { handleStartMultiplayerGame(); requestLandscape(); })}
+                            disabled={loading || (room.mode !== 'coop' && room.playerIds.length < 2)}
+                            className="flex-1 bg-[#00f2ff] hover:bg-[#00d8e6] text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 disabled:opacity-50 disabled:grayscale shadow-[0_0_30px_rgba(0,242,255,0.4)]"
+                          >
+                            {room.mode === 'coop' ? 'ABRIR SALA' : 'INICIAR COMBATE'}
+                          </button>
                       )}
                       <button 
                         onClick={handleLeaveRoom}
@@ -4422,6 +4675,17 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {rooms.length > 0 && !room && (
+                      <button
+                        onClick={handleQuickJoin}
+                        disabled={loading}
+                        className="w-full mb-4 flex items-center justify-center gap-2 bg-gradient-to-r from-[#00f2ff]/20 to-[#bc13fe]/20 hover:from-[#00f2ff]/30 hover:to-[#bc13fe]/30 border border-[#00f2ff]/30 hover:border-[#00f2ff]/50 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50 group"
+                      >
+                        <Zap className="w-4 h-4 text-[#00f2ff] group-hover:animate-pulse" />
+                        ENTRADA RÁPIDA
+                        <span className="text-[8px] text-white/30 normal-case font-normal ml-2">({rooms.length} salas disponíveis)</span>
+                      </button>
+                    )}
                     {rooms.length > 0 ? (
                       deduplicateItems(rooms, (r) => `room-${r.id}`, 'LobbyRooms').map((r) => (
                         <motion.div 
@@ -4435,8 +4699,20 @@ export default function App() {
                               <Users className="w-6 h-6 text-[#00f2ff]" />
                             </div>
                             <div>
-                              <h4 className="text-white font-bold uppercase tracking-wider">Sala de {r.players?.[r.hostId]?.nickname || 'Jogador'}</h4>
-                              <p className="text-white/30 text-[10px] uppercase tracking-widest mt-0.5">{r.playerIds.length}/4 Jogadores</p>
+                              <h4 className="text-white font-bold uppercase tracking-wider">
+                                {r.players?.[r.hostId]?.nickname || 'Jogador'}'s Sala
+                              </h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-white/30 text-[10px] uppercase tracking-widest">
+                                  {r.playerIds.length}/4 Jogadores
+                                </span>
+                                <span className="text-[8px] text-white/20">|</span>
+                                <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                                  r.mode === 'ffa' ? 'text-red-400' : r.mode === 'teams' ? 'text-blue-400' : 'text-green-400'
+                                }`}>
+                                  {r.mode === 'ffa' ? 'FFA' : r.mode === 'teams' ? '2V2' : 'CO-OP'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           <button 
@@ -5115,7 +5391,7 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-3 md:p-4 overflow-y-auto"
-            onClick={() => { setShowGameOver(false); setGameState('menu'); }}
+            onClick={() => { setShowGameOver(false); setShowMatchIntro(false); setGameState('menu'); }}
           >
             <motion.div
               initial={{ scale: 0.9, y: 40, opacity: 0 }}

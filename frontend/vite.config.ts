@@ -48,7 +48,7 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         strategies: 'generateSW',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        includeAssets: ['logo.png', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'TryHard Academy',
           short_name: 'TryHard',
@@ -60,7 +60,7 @@ export default defineConfig(({mode}) => {
           start_url: './',
           icons: [
             {
-              src: 'https://i.ibb.co/fzJkYxJj/a9baf465-f1bb-4dca-960a-b0e057f3565a.png',
+              src: 'icon-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'

@@ -12,7 +12,9 @@ export type SoundEffect =
     | 'victory' 
     | 'death' 
     | 'correct' 
-    | 'wrong';
+    | 'wrong'
+    | 'match_intro'
+    | 'countdown_tick';
 
 class AudioManager {
     private static instance: AudioManager;
@@ -158,6 +160,22 @@ class AudioManager {
                 gain.gain.setValueAtTime(0.15, t);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
                 osc.start(t); osc.stop(t + 0.3);
+                break;
+            case 'match_intro':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(1200, t + 0.5);
+                gain.gain.setValueAtTime(0.01, t);
+                gain.gain.linearRampToValueAtTime(0.15, t + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                osc.start(t); osc.stop(t + 0.6);
+                break;
+            case 'countdown_tick':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, t);
+                gain.gain.setValueAtTime(0.08, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                osc.start(t); osc.stop(t + 0.05);
                 break;
         }
     }
