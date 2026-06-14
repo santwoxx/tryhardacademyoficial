@@ -236,7 +236,6 @@ interface MainMenuScreenProps {
   setHasNewChatMessages: (v: boolean) => void;
   setShowLeaderboard: (v: boolean) => void;
   setShowSettings: (v: boolean) => void;
-  handleBuyVip: () => void;
   setShowTutorial: (v: boolean) => void;
   setShowPrivacyPolicy: (v: boolean) => void;
   beginGameWithRotationCheck: (cb: () => void) => void;
@@ -262,7 +261,6 @@ export function MainMenuScreen({
   setHasNewChatMessages,
   setShowLeaderboard,
   setShowSettings,
-  handleBuyVip,
   setShowTutorial,
   setShowPrivacyPolicy,
   beginGameWithRotationCheck,

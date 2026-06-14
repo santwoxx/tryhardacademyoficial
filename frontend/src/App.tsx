@@ -3724,7 +3724,6 @@ export default function App() {
             setHasNewChatMessages={setHasNewChatMessages}
             setShowLeaderboard={setShowLeaderboard}
             setShowSettings={setShowSettings}
-            handleBuyVip={handleBuyVip}
             setShowTutorial={setShowTutorial}
             setShowPrivacyPolicy={setShowPrivacyPolicy}
             beginGameWithRotationCheck={beginGameWithRotationCheck}
