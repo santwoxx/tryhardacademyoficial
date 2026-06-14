@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Game } from '../game/engine';
+import { Game, WORLD_WIDTH, WORLD_HEIGHT } from '../game/engine';
 
 interface MiniMapProps {
   game: Game | null;
@@ -189,7 +189,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({ game, visible }) => {
           </div>
         </div>
         <div className="absolute bottom-1 right-2 z-10">
-          <span className="text-[6px] text-white/20 font-mono">[{worldSize.width}x{worldSize.height}]</span>
+          <span className="text-[6px] text-white/20 font-mono">[{WORLD_WIDTH}x{WORLD_HEIGHT}]</span>
         </div>
         <canvas 
           ref={canvasRef} 

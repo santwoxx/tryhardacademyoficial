@@ -35,7 +35,7 @@ export const MatchIntro: React.FC<MatchIntroProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [phase, setPhase] = useState<'enter' | 'tips' | 'loading' | 'exit'>('enter');
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -222,20 +222,20 @@ export const MatchIntro: React.FC<MatchIntroProps> = ({
           >
             <div className="flex items-start gap-4">
               {isMobile ? (
-                <div className="text-3xl flex-shrink-0">{currentTip?.split(' ')[0]}</div>
+                <div className="text-3xl flex-shrink-0">{(currentTip as string).split(' ')[0]}</div>
               ) : (
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/20 flex items-center justify-center flex-shrink-0 text-2xl">
-                  {currentTip?.icon}
+                  {(currentTip as any).icon}
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 {!isMobile && (
                   <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">
-                    {currentTip?.title}
+                    {(currentTip as any).title}
                   </h3>
                 )}
                 <p className={`${isMobile ? 'text-base' : 'text-sm'} text-white/70 leading-relaxed`}>
-                  {isMobile ? currentTip : currentTip?.desc}
+                  {isMobile ? (currentTip as string) : (currentTip as any).desc}
                 </p>
               </div>
             </div>

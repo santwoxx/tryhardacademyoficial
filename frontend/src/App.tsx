@@ -26,6 +26,19 @@ import firebaseConfig from '../firebase-applet-config.json';
 import { QuestionEngine, Question } from './game/questionEngine';
 import { LoadingScreen } from './components/LoadingScreen';
 import { MatchIntro } from './components/MatchIntro';
+import { BannedScreen } from './screens/BannedScreen';
+import { TimeLimitScreen } from './screens/TimeLimitScreen';
+import { AuthScreen } from './screens/AuthScreen';
+import { MainMenuScreen } from './screens/MainMenuScreen';
+import { LobbyScreen } from './screens/LobbyScreen';
+import { SettingsModal } from './screens/SettingsModal';
+import { TutorialModal } from './screens/TutorialModal';
+import { VictoryScreen } from './screens/VictoryScreen';
+import { GameOverScreen } from './screens/GameOverScreen';
+import { QuestionModal } from './screens/QuestionModal';
+import { RotatePrompt } from './screens/RotatePrompt';
+import { MissionsMenu } from './screens/MissionsMenu';
+import { CornerDecoration, deduplicateItems } from './lib/ui';
 
 // Lazy loaded components for better performance
 // Usa lazyImport() em vez de React.lazy() direto para ganhar
@@ -278,31 +291,7 @@ const DEFAULT_HUD_CONFIG: HUDConfig = {
   shootButtonSize: 140,
 };
 
-const CornerDecoration = ({ className = "" }: { className?: string }) => (
-  <div className={`absolute pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity ${className}`}>
-    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-current" />
-    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-current" />
-    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-current" />
-    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-current" />
-  </div>
-);
 
-// Helper to ensure unique keys and log duplicates
-const deduplicateItems = <T,>(items: T[], keyExtractor: (item: T, index: number) => string, listName: string): T[] => {
-  if (!items) return [];
-  const seen = new Set<string>();
-  const result: T[] = [];
-  items.forEach((item, index) => {
-    const key = keyExtractor(item, index);
-    if (seen.has(key)) {
-      console.error(`[REACT KEY COLLISION] List: ${listName}, Key: ${key}. This will cause rendering issues.`);
-    } else {
-      seen.add(key);
-      result.push(item);
-    }
-  });
-  return result;
-};
 
 interface GameHUDProps {
   stats: { lives: number; ammo: number; kills: number; level: number };
@@ -620,20 +609,8 @@ const GameHUD = React.memo<GameHUDProps>(({
 
       <canvas ref={canvasRef} style={{ touchAction: 'none' }} />
 
-      <AnimatePresence>
-        {showMatchIntro && (
-          <MatchIntro
-            isMultiplayer={matchIntroMultiplayer}
-            isMobile={isTouch}
-            isLandscape={isLandscape}
-            onDismiss={handleMatchIntroDismiss}
-            loadingProgress={loadingProgress}
-          />
-        )}
-      </AnimatePresence>
-
       <React.Suspense fallback={null}>
-        <MiniMap game={gameRef.current} visible={!!room && !showMatchIntro} />
+        <MiniMap game={gameRef.current} visible={!!room} />
       </React.Suspense>
 
       {isTouch && !isCustomizingHUD && (
@@ -848,230 +825,6 @@ const GameHUD = React.memo<GameHUDProps>(({
   );
 });
 
-const MainMenuSkinShowcase: React.FC<{ skinId: number | string; size?: number }> = ({ skinId, size = 200 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    const skin = SKINS.find(s => s.id === skinId) || SKINS[0];
-
-    const render = () => {
-      const time = Date.now() / 1000;
-      const cx = size / 2;
-      const cy = size / 2;
-
-      ctx.clearRect(0, 0, size, size);
-      const r = size * 0.22;
-
-      // Draw Platform beneath character
-      ctx.save();
-      ctx.translate(cx, cy + r * 1.2);
-      ctx.scale(1, 0.35); // Perspective flattening
-      
-      // Outer platform ring
-      ctx.strokeStyle = skin.glowColor || '#00f2ff';
-      ctx.lineWidth = 3;
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = skin.glowColor || '#00f2ff';
-      ctx.beginPath();
-      ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Platform grid rays
-      ctx.strokeStyle = `${skin.glowColor || '#00f2ff'}44`;
-      ctx.lineWidth = 1;
-      ctx.shadowBlur = 0;
-      for (let i = 0; i < 8; i++) {
-        const angle = (i * Math.PI * 2) / 8 + time * 0.2;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(angle) * r * 1.8, Math.sin(angle) * r * 1.8);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Draw Character (Skin)
-      ctx.save();
-      ctx.translate(cx, cy);
-
-      // Pulse and float
-      const floatOffset = Math.sin(time * 3) * 6;
-      ctx.translate(0, floatOffset);
-
-      // Rotate character gently
-      ctx.rotate(time * 0.5);
-
-      // Draw Aura
-      if (skin.aura && skin.aura !== 'none') {
-        const auraSize = r * 2.2;
-        ctx.save();
-        ctx.globalAlpha = 0.25;
-        const grad = ctx.createRadialGradient(0, 0, r, 0, 0, auraSize);
-        grad.addColorStop(0, skin.color);
-        grad.addColorStop(0.5, skin.secondaryColor || skin.color);
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(0, 0, auraSize, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // Draw Shape
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = skin.glowColor;
-      ctx.strokeStyle = skin.color;
-      ctx.fillStyle = skin.color;
-      ctx.lineWidth = 4;
-      ctx.lineJoin = 'round';
-
-      const drawShape = (radius: number) => {
-        ctx.beginPath();
-        switch (skin.shape) {
-          case 'circle': ctx.arc(0, 0, radius, 0, Math.PI * 2); break;
-          case 'hexagon':
-            for (let i = 0; i < 6; i++) {
-              const a = (i * Math.PI * 2) / 6;
-              ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
-            }
-            break;
-          case 'star':
-            for (let i = 0; i < 10; i++) {
-              const a = (i * Math.PI * 2) / 10;
-              const rad = i % 2 === 0 ? radius : radius * 0.5;
-              ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-            }
-            break;
-          case 'octagon':
-            for (let i = 0; i < 8; i++) {
-              const a = (i * Math.PI * 2) / 8;
-              ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
-            }
-            break;
-          case 'diamond':
-            ctx.moveTo(0, -radius); ctx.lineTo(radius * 0.8, 0); ctx.lineTo(0, radius); ctx.lineTo(-radius * 0.8, 0);
-            break;
-          case 'square': ctx.rect(-radius * 0.8, -radius * 0.8, radius * 1.6, radius * 1.6); break;
-          case 'triangle': ctx.moveTo(0, -radius); ctx.lineTo(radius, radius * 0.8); ctx.lineTo(-radius, radius * 0.8); break;
-          case 'cross':
-            const w = radius * 0.4;
-            ctx.moveTo(-radius, -w); ctx.lineTo(-w, -w); ctx.lineTo(-w, radius);
-            ctx.lineTo(w, -radius); ctx.lineTo(w, -w); ctx.lineTo(radius, -w);
-            ctx.lineTo(radius, w); ctx.lineTo(w, w); ctx.lineTo(w, radius);
-            ctx.lineTo(-w, radius); ctx.lineTo(-w, w); ctx.lineTo(-radius, w);
-            break;
-          case 'shield':
-            ctx.moveTo(0, -radius); ctx.bezierCurveTo(radius, -radius, radius, radius * 0.5, 0, radius); ctx.bezierCurveTo(-radius, radius * 0.5, -radius, -radius, 0, -radius);
-            break;
-          case 'gear':
-            for (let i = 0; i < 16; i++) {
-              const a = (i * Math.PI * 2) / 16;
-              const rad = i % 2 === 0 ? radius : radius * 0.8;
-              ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-            }
-            break;
-        }
-        ctx.closePath();
-      };
-
-      drawShape(r);
-      ctx.stroke();
-
-      // Gradient Fill
-      const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
-      grad.addColorStop(0, '#ffffff44');
-      grad.addColorStop(0.3, skin.color);
-      grad.addColorStop(1, '#00000033');
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Details
-      const secondaryColor = skin.secondaryColor || skin.color;
-      ctx.strokeStyle = secondaryColor;
-      ctx.lineWidth = 3;
-      if (skin.details === 'core') {
-        ctx.beginPath(); ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2); ctx.stroke();
-      } else if (skin.details === 'double') {
-        drawShape(r * 0.6); ctx.stroke();
-      } else if (skin.details === 'triple') {
-        drawShape(r * 0.7); ctx.stroke();
-        drawShape(r * 0.4); ctx.stroke();
-      } else if (skin.details === 'spikes') {
-        for (let i = 0; i < 8; i++) {
-          const a = (i * Math.PI * 2) / 8;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-          ctx.lineTo(Math.cos(a) * r * 1.3, Math.sin(a) * r * 1.3);
-          ctx.stroke();
-        }
-      } else if (skin.details === 'circuit') {
-        ctx.strokeRect(-r * 0.3, -r * 0.3, r * 0.6, r * 0.6);
-      } else if (skin.details === 'ornate') {
-        drawShape(r * 0.6); ctx.stroke();
-        for (let i = 0; i < 4; i++) {
-          const a = (i * Math.PI * 2) / 4;
-          ctx.beginPath();
-          ctx.arc(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7, r * 0.2, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      } else if (skin.details === 'crown') {
-        ctx.save();
-        ctx.fillStyle = '#ffea00';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1.5;
-        const cw = r * 0.8;
-        const ch = r * 0.5;
-        ctx.translate(0, -r * 1.1);
-        ctx.beginPath();
-        ctx.moveTo(-cw/2, 0);
-        ctx.lineTo(-cw/2, -ch);
-        ctx.lineTo(-cw/4, -ch * 0.6);
-        ctx.lineTo(0, -ch);
-        ctx.lineTo(cw/4, -ch * 0.6);
-        ctx.lineTo(cw/2, -ch);
-        ctx.lineTo(cw/2, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Satellites
-      if (skin.details === 'satellites') {
-        for (let i = 0; i < 3; i++) {
-          const ang = time * 2.5 + (i * Math.PI * 2) / 3;
-          const sx = Math.cos(ang) * r * 1.6;
-          const sy = Math.sin(ang) * r * 1.6;
-          ctx.save();
-          ctx.translate(sx, sy);
-          ctx.fillStyle = skin.color;
-          ctx.beginPath();
-          ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-
-      ctx.restore();
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [skinId, size]);
-
-  return <canvas ref={canvasRef} width={size} height={size} className="block select-none pointer-events-none" />;
-};
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1135,7 +888,7 @@ export default function App() {
   });
   const [isCustomizingHUD, setIsCustomizingHUD] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [selectedOption, setSelectedOption] = useState<any>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | 'timeout' | null>(null);
   const [combo, setCombo] = useState(0);
   const [timeLeft, setTimeLeft] = useState(8);
@@ -1158,7 +911,22 @@ export default function App() {
   const [lobbyFilterMode, setLobbyFilterMode] = useState<'all' | 'ffa' | 'teams' | 'coop'>('all');
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [matchmakingStatus, setMatchmakingStatus] = useState<string>('');
-  const [playerData, setPlayerData] = useState<any>(null);
+  const [playerData, _setPlayerData] = useState<any>(null);
+  const setPlayerData = (val: any) => {
+    if (val === null || val === undefined) {
+      _setPlayerData(null);
+    } else if (typeof val === 'function') {
+      _setPlayerData((prev: any) => {
+        const res = val(prev);
+        if (res) {
+          return { ...res, isVIP: true };
+        }
+        return res;
+      });
+    } else {
+      _setPlayerData({ ...val, isVIP: true });
+    }
+  };
   const [joystickPos, setJoystickPos] = useState<{ x: number; y: number } | null>(null);
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickHandlePos, setJoystickHandlePos] = useState({ x: 0, y: 0 });
@@ -1375,6 +1143,10 @@ export default function App() {
       setIsOnline(snap.val() === true);
     });
 
+    // Detect touch capability on mount
+    const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0) || window.innerWidth < 1024;
+    setIsTouch(isMobileDevice);
+
     return () => {
       offsetUnsubscribe();
       connectedUnsubscribe();
@@ -1501,7 +1273,7 @@ export default function App() {
               role: role,
               teacherId,
               schoolName,
-              isVIP: false,
+              isVIP: true,
               playtimeToday: 0,
               lastPlayedDate: new Date().toISOString().split('T')[0],
               lastUpdate: fsServerTimestamp()
@@ -3421,6 +3193,36 @@ export default function App() {
       console.error("Leave Room Error:", error);
     }
   };
+
+  const handleKickPlayer = async (pid: string) => {
+    if (!room || !user || room.hostId !== user.uid) return;
+    try {
+      const roomsRtRef = ref(db, `rooms/${room.id}`);
+      
+      // Transactional remove from RTDB
+      await runTransaction(roomsRtRef, (roomData) => {
+        if (!roomData || !roomData.players) return roomData;
+        
+        if (roomData.players[pid]) {
+          delete roomData.players[pid];
+          roomData.playerCount = Math.max(0, (roomData.playerCount || 1) - 1);
+        }
+        
+        return roomData;
+      });
+
+      // Sync Firestore
+      const roomDocRef = doc(firestore, 'rooms', room.id);
+      const currentPlayers = { ...room.players };
+      delete currentPlayers[pid];
+      await updateDoc(roomDocRef, { 
+        players: currentPlayers,
+        playerCount: fsIncrement(-1)
+      });
+    } catch (error) {
+      console.error("Kick Player Error:", error);
+    }
+  };
   // Wraps an "enter game" action with the mobile-rotate prompt + time-limit guard
   const beginGameWithRotationCheck = (action: () => void) => {
     triggerHaptic();
@@ -3542,7 +3344,7 @@ export default function App() {
     }
   };
 
-  const handleAnswer = (option: number | null) => {
+  const handleAnswer = (option: any) => {
     if (!currentQuestion || !gameRef.current) return;
 
     setSelectedOption(option);
@@ -3878,464 +3680,73 @@ export default function App() {
         <div className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent z-[1000] opacity-30" />
         <div className="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent z-[1000] opacity-30" />
 
+        <AnimatePresence>
+          {showMatchIntro && (
+            <MatchIntro
+              isMultiplayer={matchIntroMultiplayer}
+              isMobile={isTouch}
+              isLandscape={isLandscape}
+              onDismiss={handleMatchIntroDismiss}
+              loadingProgress={loadingProgress}
+            />
+          )}
+        </AnimatePresence>
+
         <AnimatePresence mode="wait">
         {gameState === 'banned' && (
-          <motion.div 
-            key="banned-screen"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] p-4 text-center"
-          >
-            <div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center border-2 border-red-500 mb-6">
-              <AlertCircle className="w-12 h-12 text-red-500" />
-            </div>
-            <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic mb-4">Conta Suspensa</h1>
-            <p className="text-white/60 max-w-md mx-auto mb-8 leading-relaxed">
-              Sua conta foi permanentemente banida da Tryhard Academy devido a violações das regras do jogo ou uso de trapaças.
-            </p>
-            <button 
-              onClick={() => auth.signOut()}
-              className="px-8 py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
-            >
-              Sair da Conta
-            </button>
-          </motion.div>
+          <BannedScreen auth={auth} />
         )}
 
         {gameState === 'time-limit' && (
-          <motion.div
-            key="time-limit-screen"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] p-4 text-center overflow-y-auto"
-          >
-            <div className="w-24 h-24 rounded-full bg-yellow-500/10 flex items-center justify-center border-2 border-yellow-500 mb-6 animate-pulse">
-              <Timer className="w-12 h-12 text-yellow-500" />
-            </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic mb-4">Tempo Esgotado</h1>
-            <p className="text-white/60 max-w-md mx-auto mb-8 leading-relaxed">
-              Você atingiu o limite de <span className="text-white font-black">30 minutos diários</span> gratuitos.<br/><br/>
-              Assine o plano <span className="text-[#bc13fe] font-black uppercase">Tryhard VIP</span> (R$ 14,90/mês) para jogar <span className="text-yellow-400 font-black">ilimitado</span> todos os dias!
-            </p>
-
-            {/* VIP benefits */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-md mb-8">
-              {[
-                { icon: Timer, label: 'Tempo Ilimitado' },
-                { icon: Crown, label: 'Selo VIP' },
-                { icon: Star, label: 'Skins Exclusivas' }
-              ].map((b, i) => (
-                <div key={i} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
-                  <b.icon className="w-4 h-4 text-yellow-400" />
-                  <span className="text-[10px] font-black uppercase tracking-wider text-yellow-300">{b.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-col gap-4 w-full max-w-xs">
-              <button
-                onClick={handleBuyVip}
-                className="w-full py-4 bg-gradient-to-r from-[#bc13fe] to-[#8007cf] text-white rounded-xl font-black uppercase tracking-widest shadow-[0_0_30px_rgba(188,19,254,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Crown className="w-5 h-5 text-yellow-300" />
-                ASSINAR VIP - R$ 14,90/mês
-              </button>
-              <button
-                onClick={async () => {
-                  // Voltar para o menu e re-checar VIP (caso o webhook já tenha processado)
-                  if (user && isOnline) {
-                    try {
-                      const snap = await getDoc(doc(firestore, 'players', user.uid));
-                      if (snap.exists() && (snap.data() as any).isVIP) {
-                        setPlayerData(snap.data() as any);
-                        setGameState('menu');
-                        setPaymentReturnToast({ type: 'success' });
-                        return;
-                      }
-                    } catch (e) { /* silent */ }
-                  }
-                  setGameState('menu');
-                }}
-                className="w-full py-3 bg-white/5 border border-white/10 text-white/80 rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer text-sm"
-              >
-                Já sou VIP? Verificar
-              </button>
-              <button
-                onClick={() => auth.signOut()}
-                className="w-full py-3 bg-transparent text-white/30 hover:text-white/60 transition-colors text-[10px] font-black uppercase tracking-[0.3em]"
-              >
-                Sair da Conta
-              </button>
-            </div>
-          </motion.div>
+          <TimeLimitScreen
+            handleBuyVip={handleBuyVip}
+            user={user}
+            isOnline={isOnline}
+            setGameState={setGameState}
+            setPlayerData={setPlayerData}
+            setPaymentReturnToast={setPaymentReturnToast}
+            auth={auth}
+            firestore={firestore}
+          />
         )}
 
         {gameState === 'auth' && (
-          <motion.div 
-            key="auth-screen"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#050505] overflow-hidden p-4"
-          >
-            {/* Background Grid */}
-            <div className="absolute inset-0 opacity-20 pointer-events-none">
-              <div className="w-full h-full" style={{ 
-                backgroundImage: 'linear-gradient(rgba(0, 242, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 242, 255, 0.1) 1px, transparent 1px)',
-                backgroundSize: '50px 50px'
-              }} />
-            </div>
-
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="relative z-10 w-full max-w-md bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl shadow-2xl"
-            >
-              <div className="text-center mb-8">
-                <img 
-                  src="./logo.png" 
-                  alt="Tryhard Academy Logo" 
-                  className="w-24 h-24 mx-auto mb-4 object-contain drop-shadow-[0_0_15px_rgba(188,19,254,0.4)]"
-                />
-                <h1 className="text-3xl font-black italic text-white tracking-tighter mb-2">
-                  TRYHARD <span className="text-[#bc13fe]">ACADEMY</span>
-                </h1>
-                <p className="text-white/40 text-xs uppercase tracking-widest font-bold">
-                  Bem-vindo ao Combate
-                </p>
-              </div>
-
-              {playerData?.role === 'pending-teacher' ? (
-                <div className="text-center py-8">
-                  <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-orange-500/30">
-                    <Timer className="w-10 h-10 text-orange-500 animate-pulse" />
-                  </div>
-                  <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic mb-4">Aguardando Aprovação</h2>
-                  <p className="text-white/60 text-sm leading-relaxed mb-8">
-                    Seu cadastro de professor foi recebido! <br/>
-                    O administrador do jogo precisa aprovar seu acesso antes que você possa gerenciar seus alunos.
-                  </p>
-                  <button 
-                    onClick={() => auth.signOut()}
-                    className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
-                  >
-                    Sair da Conta
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-6 items-center">
-                  <h2 className="text-white text-center font-bold uppercase tracking-widest text-sm mb-2">Pronto para a Arena?</h2>
-                  
-                  {authError && (
-                    <div className="w-full flex items-center gap-2 text-red-500 text-xs font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>{authError}</span>
-                    </div>
-                  )}
-
-                  <button 
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    className="group relative w-full py-5 bg-gradient-to-r from-[#bc13fe] to-[#8007cf] hover:from-[#d024ff] hover:to-[#9612eb] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-[0_0_35px_rgba(188,19,254,0.4)] disabled:opacity-50"
-                  >
-                    <Users className="w-5 h-5 text-white animate-pulse" />
-                    Entrar com o Google
-                  </button>
-
-                  <button 
-                    onClick={handleGuestLogin}
-                    disabled={loading}
-                    className="w-full py-4 bg-[#0a0a0a] border border-[#bc13fe]/30 hover:border-[#bc13fe]/70 hover:bg-[#bc13fe]/5 text-white rounded-2xl font-black uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                  >
-                    Entrar em Modo de Teste
-                  </button>
-                  
-                  <p className="text-[10px] text-white/30 uppercase tracking-widest text-center">
-                    Acesso exclusivo via login Google ou Modo de Teste
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
+          <AuthScreen
+            playerData={playerData}
+            authError={authError}
+            loading={loading}
+            handleGoogleLogin={handleGoogleLogin}
+            handleGuestLogin={handleGuestLogin}
+            auth={auth}
+          />
         )}
 
         {gameState === 'menu' && (
-          <motion.div 
-            key="main-menu"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex flex-col items-center justify-between p-4 md:p-6 bg-[radial-gradient(circle_at_center,_#0f0a1a_0%,_#050505_100%)] overflow-y-auto custom-scrollbar"
-          >
-            {/* Ambient Back Glows and Grid */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute top-[20%] left-[-10%] w-[50%] h-[50%] bg-[#bc13fe]/5 blur-[150px] rounded-full animate-pulse" />
-              <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-cyan-500/5 blur-[150px] rounded-full animate-pulse" style={{ animationDuration: '6s' }} />
-            </div>
-
-            {/* Top Navigation Bar */}
-            <div className="w-full flex justify-between items-center z-10 border-b border-white/5 pb-4 mb-4 gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-                <span className="text-[9px] font-black uppercase tracking-[0.25em] text-white/50">Servidor Principal: ONLINE</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* Daily playtime status */}
-                {playerData?.isVIP ? (
-                  <div className="px-3 py-1 bg-yellow-500/15 border border-yellow-400/40 rounded-lg flex items-center gap-1.5 shadow-[0_0_12px_rgba(234,179,8,0.25)]">
-                    <Crown className="w-3 h-3 text-yellow-400" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-yellow-400">VIP Ilimitado</span>
-                  </div>
-                ) : (
-                  <div className={`px-3 py-1 rounded-lg flex items-center gap-1.5 border ${
-                    remainingSeconds <= 60
-                      ? 'bg-red-500/15 border-red-400/40 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
-                      : remainingSeconds <= 300
-                      ? 'bg-yellow-500/15 border-yellow-400/40 shadow-[0_0_12px_rgba(234,179,8,0.25)]'
-                      : 'bg-white/5 border-white/10'
-                  }`}>
-                    <Timer className={`w-3 h-3 ${
-                      remainingSeconds <= 60 ? 'text-red-400 animate-pulse' :
-                      remainingSeconds <= 300 ? 'text-yellow-400' : 'text-cyan-400'
-                    }`} />
-                    <span className={`text-[8px] font-black uppercase tracking-widest tabular-nums ${
-                      remainingSeconds <= 60 ? 'text-red-300' :
-                      remainingSeconds <= 300 ? 'text-yellow-300' : 'text-white/60'
-                    }`}>
-                      {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')} grátis
-                    </span>
-                  </div>
-                )}
-
-                {!isOnline && (
-                  <div className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                    <WifiOff size={10} className="text-red-400" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-red-400">Modo Offline</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Main Dashboard Layout */}
-            <div className="w-full max-w-6xl flex-1 grid grid-cols-1 md:grid-cols-12 gap-8 items-center z-10 py-2">
-              {/* Left Column: Steam-style Vertical Navigation */}
-              <div className="md:col-span-5 lg:col-span-4 flex flex-col items-center md:items-start text-center md:text-left h-full justify-center">
-                {/* Stylized Game Logo */}
-                <motion.div
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  className="mb-8 md:mb-12"
-                >
-                  <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter text-white italic leading-[0.8] select-none">
-                    TRYHARD<br/>
-                    <span className="text-[#bc13fe] drop-shadow-[0_0_35px_rgba(188,19,254,0.5)]">ACADEMY</span>
-                  </h1>
-                  <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.45em] mt-3 pl-1">Arena do Conhecimento</p>
-                </motion.div>
-
-                {/* Steam List Menu */}
-                <div className="w-full flex flex-col gap-2.5">
-                  {/* JOGAR ONLINE */}
-                  <motion.button 
-                    whileHover={{ x: 8 }}
-                    onClick={() => { 
-                      handleMultiplayer(); 
-                      requestLandscape(); 
-                      triggerHaptic();
-                      if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen().catch(() => {});
-                      }
-                    }}
-                    className="w-full text-left p-4 rounded-xl border border-[#bc13fe]/30 bg-gradient-to-r from-[#bc13fe]/10 via-[#bc13fe]/5 to-transparent hover:border-[#bc13fe] hover:from-[#bc13fe]/20 hover:to-[#bc13fe]/5 flex items-center justify-between group transition-all duration-300 relative overflow-hidden shadow-[0_0_30px_rgba(188,19,254,0.05)] hover:shadow-[0_0_30px_rgba(188,19,254,0.15)]"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#bc13fe] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                    <div>
-                      <span className="text-white text-base md:text-xl font-black italic tracking-tighter uppercase leading-none block">JOGAR ONLINE</span>
-                      <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest mt-1 block">Combate Multiplayer em Arena</span>
-                    </div>
-                    <Globe size={18} className="text-[#bc13fe] group-hover:rotate-180 transition-transform duration-500" />
-                  </motion.button>
-
-                  {/* PRATICAR */}
-                  <motion.button 
-                    whileHover={{ x: 8 }}
-                    onClick={() => { beginGameWithRotationCheck(() => { handleStartGame(); requestLandscape(); }); }}
-                    className="w-full text-left p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:border-cyan-500/50 hover:bg-cyan-500/[0.05] flex items-center justify-between group transition-all duration-300 relative overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                    <div>
-                      <span className="text-white text-base md:text-xl font-black italic tracking-tighter uppercase leading-none block">PRATICAR</span>
-                      <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest mt-1 block">Treino Offline contra Bots</span>
-                    </div>
-                    <Zap size={18} className="text-cyan-400 group-hover:scale-110 transition-transform" />
-                  </motion.button>
-
-                  {/* LOJA DE SKINS */}
-                  <motion.button 
-                    whileHover={{ x: 6 }}
-                    onClick={() => setShowStore(true)}
-                    className="w-full text-left py-3 px-4 rounded-xl border border-white/5 bg-white/[0.01] hover:border-[#bc13fe]/40 hover:bg-white/[0.03] flex items-center justify-between group transition-all duration-300 relative overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#bc13fe]/50 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                    <div>
-                      <span className="text-white text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">LOJA DE SKINS</span>
-                      <span className="text-white/30 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Customizar Aparência</span>
-                    </div>
-                    <ShoppingBag size={14} className="text-[#bc13fe]" />
-                  </motion.button>
-
-                  {/* ASSINAR VIP */}
-                  {!playerData?.isVIP && (
-                    <motion.button
-                      whileHover={{ x: 6 }}
-                      onClick={handleBuyVip}
-                      className="w-full text-left py-3 px-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 hover:border-yellow-500 hover:bg-yellow-500/20 flex items-center justify-between group transition-all duration-300 relative overflow-hidden shadow-[0_0_15px_rgba(234,179,8,0.2)]"
-                    >
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                      <div>
-                        <span className="text-yellow-500 text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">SEJA VIP</span>
-                        <span className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Remover Limite de Tempo</span>
-                      </div>
-                      <Crown size={14} className="text-yellow-500 animate-pulse" />
-                    </motion.button>
-                  )}
-                  {playerData?.isVIP && (
-                    <motion.div
-                      className="w-full py-2.5 px-4 rounded-xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/15 to-yellow-600/5 flex items-center gap-2"
-                    >
-                      <Crown className="w-4 h-4 text-yellow-400" />
-                      <div>
-                        <div className="text-yellow-400 text-[10px] font-black uppercase tracking-widest">Tryhard VIP Ativo</div>
-                        <div className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest">Jogo ilimitado todos os dias</div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* CHAT GLOBAL */}
-                  <motion.button 
-                    whileHover={{ x: 6 }}
-                    onClick={() => { setShowGlobalChat(true); setHasNewChatMessages(false); }}
-                    className="w-full text-left py-3 px-4 rounded-xl border border-white/5 bg-white/[0.01] hover:border-green-500/40 hover:bg-white/[0.03] flex items-center justify-between group transition-all duration-300 relative overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500/50 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <span className="text-white text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">CHAT GLOBAL</span>
-                        <span className="text-white/30 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Mensagens em Tempo Real</span>
-                      </div>
-                      {hasNewChatMessages && <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
-                    </div>
-                    <MessageSquare size={14} className="text-green-500" />
-                  </motion.button>
-
-                  {/* RANKING GLOBAL (LEADERBOARD) */}
-                  <motion.button 
-                    whileHover={{ x: 6 }}
-                    onClick={() => setShowLeaderboard(true)}
-                    className="w-full text-left py-3 px-4 rounded-xl border border-white/5 bg-white/[0.01] hover:border-[#ffea00]/40 hover:bg-white/[0.03] flex items-center justify-between group transition-all duration-300 relative overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ffea00]/50 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                    <div>
-                      <span className="text-white text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">RANKING GLOBAL</span>
-                      <span className="text-white/30 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Classificação dos Melhores</span>
-                    </div>
-                    <Crown size={14} className="text-[#ffea00]" />
-                  </motion.button>
-
-                  {/* SETTINGS / AJUSTES */}
-                  <motion.button 
-                    whileHover={{ x: 6 }}
-                    onClick={() => setShowSettings(true)}
-                    className="w-full text-left py-3 px-4 rounded-xl border border-white/5 bg-white/[0.01] hover:border-white/20 hover:bg-white/[0.03] flex items-center justify-between group transition-all duration-300 relative overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                    <div>
-                      <span className="text-white text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">AJUSTES & PERFIL</span>
-                      <span className="text-white/30 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Áudio, Gráficos e Conta</span>
-                    </div>
-                    <Settings size={14} className="text-white/40" />
-                  </motion.button>
-                </div>
-              </div>
-
-              {/* Right Column: Character Showcase & Stats */}
-              <div className="md:col-span-7 lg:col-span-8 flex flex-col justify-center items-center h-full">
-                <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                  className="w-full max-w-lg bg-black/40 border border-white/10 rounded-[2.5rem] p-6 flex flex-col items-center justify-between relative overflow-hidden backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] min-h-[420px]"
-                >
-                  {/* Subtle light behind the character select */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-[#bc13fe]/10 blur-[80px] rounded-full pointer-events-none" />
-
-                  {/* Profile Header */}
-                  <div className="w-full flex items-center justify-between border-b border-white/5 pb-3 z-10">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#bc13fe] to-[#8a00ff] flex items-center justify-center border border-white/10 shadow-[0_0_20px_rgba(188,19,254,0.3)]">
-                        <User size={16} className="text-white" />
-                      </div>
-                      <div className="flex flex-col text-left min-w-0">
-                        <span className="text-sm font-black text-white italic tracking-wide uppercase leading-none truncate max-w-[120px]">{nickname || 'CONECTANDO...'}</span>
-                        <span className="text-[8px] font-black uppercase tracking-widest text-[#bc13fe] mt-1">RECRUTA • NÍVEL {currentLevel}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-[#ffea00]/10 border border-[#ffea00]/30 rounded-lg px-2.5 py-1.5 hover:bg-[#ffea00]/20 transition-all">
-                      <Trophy size={12} className="text-[#ffea00] drop-shadow-[0_0_8px_rgba(255,234,0,0.5)]" />
-                      <span className="text-white text-xs font-black italic tracking-tight tabular-nums">{trophies}</span>
-                    </div>
-                  </div>
-
-                  {/* Custom Character Preview */}
-                  <div className="my-1 relative flex items-center justify-center w-full z-10">
-                    <MainMenuSkinShowcase skinId={currentSkinId} size={180} />
-
-                    <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 bg-white/5 border border-white/10 rounded-full py-1 px-4 text-[8px] font-black text-white/50 uppercase tracking-widest select-none shadow-lg">
-                      Visualização do Avatar
-                    </div>
-                  </div>
-
-                  {/* Stats Grid - more compact */}
-                  <div className="w-full grid grid-cols-2 gap-2 mt-4 border-t border-white/5 pt-3 z-10">
-                    <div className="bg-white/[0.02] border border-white/5 px-2 py-2 rounded-xl text-center">
-                      <span className="text-[7px] font-black uppercase text-white/30 tracking-widest block mb-0.5">Partidas</span>
-                      <span className="text-sm font-black text-white font-mono italic leading-none">{matchCount}</span>
-                    </div>
-                    <div className="bg-white/[0.02] border border-white/5 px-2 py-2 rounded-xl text-center">
-                      <span className="text-[7px] font-black uppercase text-white/30 tracking-widest block mb-0.5">Tempo de Jogo</span>
-                      <span className="text-sm font-black text-[#00f2ff] font-mono italic leading-none">{Math.floor(totalTimePlayed / 60)}m</span>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-
-            {/* Bottom Footer Area */}
-            <div className="w-full max-w-6xl flex flex-col md:flex-row justify-between items-center z-10 border-t border-white/5 pt-4 mt-4 text-white/30 text-[10px] font-black uppercase tracking-[0.2em] gap-4">
-              <div className="flex gap-6">
-                <button 
-                  onClick={() => setShowTutorial(true)} 
-                  className="hover:text-white transition-colors flex items-center gap-2 group text-xs font-black uppercase"
-                >
-                  <BookOpen size={12} className="text-[#00f2ff] group-hover:scale-110 transition-transform" /> 
-                  MANUAL DE COMBATE
-                </button>
-                <button 
-                  onClick={() => setShowPrivacyPolicy(true)}
-                  className="hover:text-white transition-colors flex items-center gap-2 group text-xs font-black uppercase"
-                >
-                  <ShieldCheck size={12} className="text-green-500 group-hover:scale-110 transition-transform" /> 
-                  POLÍTICA DE PRIVACIDADE
-                </button>
-              </div>
-              <div className="text-[8px] opacity-50 tracking-[0.3em]">
-                TRYHARD ACADEMY v1.2.0 • © 2026 GATO GALUDO
-              </div>
-            </div>
-          </motion.div>
+          <MainMenuScreen
+            playerData={playerData}
+            remainingSeconds={remainingSeconds}
+            isOnline={isOnline}
+            nickname={nickname}
+            currentLevel={currentLevel}
+            trophies={trophies}
+            currentSkinId={currentSkinId}
+            matchCount={matchCount}
+            totalTimePlayed={totalTimePlayed}
+            hasNewChatMessages={hasNewChatMessages}
+            handleMultiplayer={handleMultiplayer}
+            requestLandscape={requestLandscape}
+            triggerHaptic={triggerHaptic}
+            setShowStore={setShowStore}
+            setShowGlobalChat={setShowGlobalChat}
+            setHasNewChatMessages={setHasNewChatMessages}
+            setShowLeaderboard={setShowLeaderboard}
+            setShowSettings={setShowSettings}
+            handleBuyVip={handleBuyVip}
+            setShowTutorial={setShowTutorial}
+            setShowPrivacyPolicy={setShowPrivacyPolicy}
+            beginGameWithRotationCheck={beginGameWithRotationCheck}
+            handleStartGame={handleStartGame}
+          />
         )}
 
         {gameState === 'admin-panel' && (
@@ -4370,7 +3781,7 @@ export default function App() {
             currentLevel={currentLevel}
             currentSkinId={currentSkinId}
             onSelectSkin={setCurrentSkinId}
-            isPremium={playerData?.role === 'admin' || playerData?.role === 'teacher'}
+            isPremium={true}
           />
       </React.Suspense>
 
@@ -4483,597 +3894,55 @@ export default function App() {
         )}
 
         {gameState === 'lobby' && (
-          <motion.div 
-            key="lobby-screen"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-[#050505]/95 backdrop-blur-xl p-6"
-          >
-            <div className="w-full max-w-2xl bg-zinc-900/50 border border-white/10 rounded-[2rem] overflow-hidden flex flex-col shadow-2xl">
-              <div className="p-8 border-b border-white/10 flex justify-between items-center bg-zinc-900/80">
-                <div className="flex-1">
-                  <h2 className="text-3xl font-black uppercase tracking-tighter text-white italic">Multiplayer <span className="text-[#00f2ff]">Lobby</span></h2>
-                  <p className="text-white/40 text-[10px] uppercase tracking-[0.3em] mt-1">Escolha uma sala ou crie a sua</p>
-                  
-                  {/* Expert Filter Logic */}
-                  {!room && (
-                    <div className="flex gap-2 mt-4">
-                      {['all', 'ffa', 'teams', 'coop'].map((m) => (
-                        <button 
-                          key={`filter-${m}`}
-                          onClick={() => setLobbyFilterMode(m as any)}
-                          className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
-                            lobbyFilterMode === m 
-                            ? 'bg-[#00f2ff] border-[#00f2ff] text-black shadow-[0_0_15px_rgba(0,242,255,0.3)]' 
-                            : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
-                          }`}
-                        >
-                          {m === 'all' ? 'TODAS' : m === 'coop' ? 'CO-OP' : m.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {!room && (
-                  <button 
-                    onClick={handleCreateRoom}
-                    disabled={loading}
-                    className="flex items-center gap-2 bg-[#00f2ff] hover:bg-[#00d8e6] text-black px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Criar Sala
-                  </button>
-                )}
-              </div>
-
-                <div className="flex-1 overflow-y-auto p-6 min-h-[400px] max-h-[60vh] custom-scrollbar">
-                  {loadingRooms ? (
-                    <div className="flex flex-col items-center justify-center h-full py-20 space-y-4">
-                      <div className="w-12 h-12 border-4 border-cyan-400/20 border-t-cyan-400 rounded-full animate-spin" />
-                      <p className="text-cyan-400/60 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Sintonizando Frequências...</p>
-                    </div>
-                  ) : room ? (
-                  <div className="flex flex-col items-center justify-center w-full space-y-6">
-                    {/* Room Header with Mode Selection for Host */}
-                    <div className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col items-center gap-3">
-                      <div className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Modo de Jogo</div>
-                      <div className="flex items-center gap-4">
-                        {room.hostId === user.uid ? (
-                          <button 
-                            onClick={handleToggleMode}
-                            className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-6 py-3 rounded-xl border border-white/10 transition-all group"
-                          >
-                            <Globe className="w-5 h-5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" />
-                            <span className="text-white font-black uppercase italic tracking-tighter text-lg">
-                              {room.mode === 'ffa' ? 'FREE FOR ALL' : room.mode === 'teams' ? 'TEAM DEATHMATCH (2V2)' : 'SALA ABERTA (CO-OP)'}
-                            </span>
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-3 px-6 py-3 rounded-xl border border-white/5">
-                            <Hash className="w-5 h-5 text-white/20" />
-                            <span className="text-white/60 font-black uppercase italic tracking-tighter text-lg">
-                              {room.mode === 'ffa' ? 'FREE FOR ALL' : room.mode === 'teams' ? 'TEAM DEATHMATCH (2V2)' : 'SALA ABERTA (CO-OP)'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {room.mode === 'coop' && (
-                        <div className="text-[10px] text-green-400/60 font-bold uppercase tracking-[0.2em] text-center py-2 px-4 bg-green-500/5 rounded-xl border border-green-500/10 w-full">
-                          🌱 Modo Livre — Sem vencedores nem perdedores. Apenas jogue e se divirta!
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                      {deduplicateItems(room.playerIds, (pid) => `lobby-p-${pid}`, 'LobbyPlayerList').map((pid: string) => {
-                        const pState = room.players?.[pid];
-                        const isMe = pid === user.uid;
-                        return (
-                          <div key={`lobby-p-${pid}`} className={`p-4 rounded-2xl border transition-all ${isMe ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-white/5 border-white/10'}`}>
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${pState?.ready ? 'bg-green-500' : 'bg-orange-500'} animate-pulse`} />
-                                <span className="text-white font-black uppercase tracking-widest text-xs truncate max-w-[120px]">
-                                  {pState?.nickname || 'Explorador'}
-                                </span>
-                              </div>
-                              {pState?.ready && (
-                                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                              )}
-                            </div>
-
-                            <div className="flex gap-2">
-                              {room.mode === 'coop' ? (
-                                <div className="flex-1 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-[9px] font-black text-green-400 text-center uppercase tracking-widest">
-                                  CO-OP
-                                </div>
-                              ) : room.mode === 'teams' ? (
-                                <button
-                                  disabled={!isMe}
-                                  onClick={handleToggleTeam}
-                                  className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                                    pState?.team === 'A' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'
-                                  }`}
-                                >
-                                  TIME {pState?.team || 'A'}
-                                </button>
-                              ) : (
-                                <div className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black text-white/40 text-center uppercase tracking-widest">
-                                  SOLO
-                                </div>
-                              )}
-                              
-                              {isMe && pid !== room.hostId && room.mode !== 'coop' && (
-                                <button
-                                  onClick={handleToggleReady}
-                                  className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                                    pState?.ready ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/10 text-white border border-white/20'
-                                  }`}
-                                >
-                                  {pState?.ready ? 'PRONTO' : 'PREPARAR'}
-                                </button>
-                              )}
-                              
-                              {pid === room.hostId && (
-                                <div className="flex-1 py-2 rounded-lg bg-yellow-400/20 text-yellow-400 border border-yellow-400/30 text-[9px] font-black text-center uppercase tracking-widest">
-                                  HOST
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {/* Empty Slots */}
-                      {Array.from({ length: 4 - room.playerIds.length }).map((_, i) => (
-                        <div 
-                          key={`empty-${i}`} 
-                          className="relative h-[92px] p-4 rounded-2xl border border-white/5 bg-zinc-950/40 flex flex-col items-center justify-center overflow-hidden"
-                        >
-                          {/* Radial Scanning line */}
-                          <div className="absolute w-[140px] h-[140px] border border-cyan-400/5 rounded-full animate-glow-pulse flex items-center justify-center pointer-events-none">
-                            <div className="w-[80px] h-[80px] border border-[#bc13fe]/5 rounded-full" />
-                          </div>
-                          
-                          {/* Rotating radar sweep line */}
-                          <div 
-                            className="absolute top-1/2 left-1/2 w-[200%] h-[200%] bg-gradient-to-tr from-[#00f2ff]/5 via-transparent to-transparent animate-radar pointer-events-none" 
-                            style={{ transformOrigin: 'top left', marginTop: '-100%', marginLeft: '-100%' }}
-                          />
-                          
-                          <div className="relative z-10 flex flex-col items-center gap-1">
-                            <motion.div 
-                              animate={{ opacity: [0.3, 0.7, 0.3] }}
-                              transition={{ repeat: Infinity, duration: 2 }}
-                              className="text-[9px] font-black uppercase tracking-[0.25em] text-cyan-400/70"
-                            >
-                              PROCURANDO ATLETA...
-                            </motion.div>
-                            <span className="text-[7px] text-white/25 uppercase font-mono tracking-widest">SLOT DISPONÍVEL</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex gap-4 w-full pt-4">
-                      {room.hostId === user.uid && (
-                          <button 
-                            onClick={() => beginGameWithRotationCheck(() => { handleStartMultiplayerGame(); requestLandscape(); })}
-                            disabled={loading || (room.mode !== 'coop' && room.playerIds.length < 2)}
-                            className="flex-1 bg-[#00f2ff] hover:bg-[#00d8e6] text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 disabled:opacity-50 disabled:grayscale shadow-[0_0_30px_rgba(0,242,255,0.4)]"
-                          >
-                            {room.mode === 'coop' ? 'ABRIR SALA' : 'INICIAR COMBATE'}
-                          </button>
-                      )}
-                      <button 
-                        onClick={handleLeaveRoom}
-                        className={`${room.hostId === user.uid ? 'w-20' : 'flex-1'} bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 border border-red-500/20`}
-                      >
-                        {room.hostId === user.uid ? <Trash2 className="w-6 h-6 mx-auto" /> : 'ABANDONAR SALA'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {rooms.length > 0 && !room && (
-                      <button
-                        onClick={handleQuickJoin}
-                        disabled={loading}
-                        className="w-full mb-4 flex items-center justify-center gap-2 bg-gradient-to-r from-[#00f2ff]/20 to-[#bc13fe]/20 hover:from-[#00f2ff]/30 hover:to-[#bc13fe]/30 border border-[#00f2ff]/30 hover:border-[#00f2ff]/50 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 disabled:opacity-50 group"
-                      >
-                        <Zap className="w-4 h-4 text-[#00f2ff] group-hover:animate-pulse" />
-                        ENTRADA RÁPIDA
-                        <span className="text-[8px] text-white/30 normal-case font-normal ml-2">({rooms.length} salas disponíveis)</span>
-                      </button>
-                    )}
-                    {rooms.length > 0 ? (
-                      deduplicateItems(rooms, (r) => `room-${r.id}`, 'LobbyRooms').map((r) => (
-                        <motion.div 
-                          key={`room-${r.id}`}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-5 bg-white/5 border border-white/10 rounded-2xl flex justify-between items-center hover:bg-white/10 transition-all group"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-[#00f2ff]/10 rounded-xl flex items-center justify-center border border-[#00f2ff]/20">
-                              <Users className="w-6 h-6 text-[#00f2ff]" />
-                            </div>
-                            <div>
-                              <h4 className="text-white font-bold uppercase tracking-wider">
-                                {r.players?.[r.hostId]?.nickname || 'Jogador'}'s Sala
-                              </h4>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-white/30 text-[10px] uppercase tracking-widest">
-                                  {r.playerIds.length}/4 Jogadores
-                                </span>
-                                <span className="text-[8px] text-white/20">|</span>
-                                <span className={`text-[9px] font-bold uppercase tracking-wider ${
-                                  r.mode === 'ffa' ? 'text-red-400' : r.mode === 'teams' ? 'text-blue-400' : 'text-green-400'
-                                }`}>
-                                  {r.mode === 'ffa' ? 'FFA' : r.mode === 'teams' ? '2V2' : 'CO-OP'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => handleJoinRoom(r.id)}
-                            disabled={loading}
-                            className="bg-white/10 hover:bg-[#00f2ff] hover:text-black text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 disabled:opacity-50"
-                          >
-                            Entrar
-                          </button>
-                        </motion.div>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/10">
-                          <Users className="w-6 h-6 text-white/20" />
-                        </div>
-                        <h3 className="text-white/40 font-bold uppercase tracking-widest text-sm">Nenhuma sala disponível</h3>
-                        <p className="text-white/20 text-[10px] uppercase tracking-widest mt-2">Seja o primeiro a criar uma!</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {!room && (
-              <button 
-                onClick={() => setGameState('menu')}
-                className="mt-8 text-white/30 hover:text-white text-[10px] uppercase tracking-widest border border-white/10 p-2 px-8 rounded-full transition-all"
-              >
-                Voltar ao Menu
-              </button>
-            )}
-          </motion.div>
+          <LobbyScreen
+            room={room}
+            rooms={rooms as any[]}
+            loadingRooms={loadingRooms}
+            lobbyFilterMode={lobbyFilterMode}
+            setLobbyFilterMode={setLobbyFilterMode}
+            handleCreateRoom={handleCreateRoom}
+            handleToggleMode={handleToggleMode}
+            handleToggleReady={handleToggleReady}
+            handleToggleTeam={handleToggleTeam}
+            handleLeaveRoom={handleLeaveRoom}
+            handleKickPlayer={handleKickPlayer}
+            handleStartMultiplayerGame={handleStartMultiplayerGame}
+            beginGameWithRotationCheck={beginGameWithRotationCheck}
+            requestLandscape={requestLandscape}
+            handleJoinRoom={handleJoinRoom}
+            handleQuickJoin={handleQuickJoin}
+            user={user}
+            loading={loading}
+            setGameState={setGameState}
+          />
         )}
 
         {showTutorial && (
-          <motion.div 
-            key="tutorial-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[500] bg-black/90 flex items-center justify-center p-6 backdrop-blur-md"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="max-w-lg w-full bg-zinc-900 border border-white/10 rounded-3xl p-8 relative overflow-hidden"
-            >
-              {/* Background Glow */}
-              <div className="absolute -top-24 -left-24 w-48 h-48 bg-purple-500/20 blur-[100px]" />
-              <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/20 blur-[100px]" />
-
-              <div className="relative z-10">
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-black text-white tracking-tighter italic">
-                    TUTORIAL <span className="text-purple-500">TRYHARD</span>
-                  </h2>
-                  <div className="px-3 py-1 bg-white/5 rounded-full text-xs font-mono text-white/50 border border-white/10">
-                    PASSO {tutorialStep + 1} DE 6
-                  </div>
-                </div>
-
-                <div className="min-h-[200px] flex flex-col justify-center">
-                  {tutorialStep === 0 && (
-                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                      <h3 className="text-xl font-bold text-white mb-4">Bem-vindo à Tryhard Academy!</h3>
-                      <p className="text-zinc-400 leading-relaxed">
-                        Prepare-se para uma experiência intensa onde conhecimento e reflexos se encontram. 
-                        Vamos te ensinar o básico para você dominar a arena.
-                      </p>
-                    </motion.div>
-                  )}
-
-                  {tutorialStep === 1 && (
-                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                      <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/30">
-                        <Move className="w-8 h-8 text-purple-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-4">Movimentação</h3>
-                      <p className="text-zinc-400 leading-relaxed mb-4">
-                        {isTouch ? 
-                          "Use o joystick no lado esquerdo da tela para mover sua nave pela arena." : 
-                          "Use as teclas WASD ou as setas do teclado para mover sua nave."}
-                      </p>
-                      <div className="flex gap-2">
-                        {isTouch ? (
-                          <div className="px-3 py-1 bg-white/5 rounded-md text-xs font-mono text-purple-400 border border-purple-500/20">JOYSTICK ESQUERDO</div>
-                        ) : (
-                          deduplicateItems(['W', 'A', 'S', 'D'], (k) => `tutorial-wasd-${k}`, 'TutorialWASD').map((k) => (
-                            <div key={`tutorial-wasd-${k}`} className="w-8 h-8 bg-white/5 rounded-md flex items-center justify-center text-xs font-mono text-purple-400 border border-purple-500/20">{k}</div>
-                          ))
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {tutorialStep === 2 && (
-                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                      <div className="w-16 h-16 bg-cyan-500/20 rounded-2xl flex items-center justify-center mb-6 border border-cyan-500/30">
-                        <Target className="w-8 h-8 text-cyan-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-4">Mira e Disparo</h3>
-                      <p className="text-zinc-400 leading-relaxed mb-4">
-                        {isTouch ? 
-                          "Toque e segure em qualquer lugar do lado direito da tela para atirar na direção do toque." : 
-                          "Use o mouse para mirar e clique (ou segure) para disparar seus projéteis."}
-                      </p>
-                      <div className="px-3 py-1 bg-white/5 rounded-md text-xs font-mono text-cyan-400 border border-cyan-500/20 inline-block">
-                        {isTouch ? "TOQUE LADO DIREITO" : "MOUSE + CLIQUE"}
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {tutorialStep === 3 && (
-                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                      <div className="w-16 h-16 bg-yellow-500/20 rounded-2xl flex items-center justify-center mb-6 border border-yellow-500/30">
-                        <Star className="w-8 h-8 text-yellow-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-4">Desafio Matemático</h3>
-                      <p className="text-zinc-400 leading-relaxed">
-                        Colete as <span className="text-yellow-400 font-bold">Estrelas Douradas</span> para ganhar munição e bônus. 
-                        Ao coletar uma, um desafio matemático surgirá. Responda rápido para ganhar o bônus de combo!
-                      </p>
-                    </motion.div>
-                  )}
-
-                  {tutorialStep === 4 && (
-                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                      <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mb-6 border border-green-500/30">
-                        <Zap className="w-8 h-8 text-green-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-4">Power-ups</h3>
-                      <p className="text-zinc-400 leading-relaxed mb-4">
-                        Fique atento aos itens que aparecem na arena:
-                      </p>
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="p-2 bg-white/5 rounded-lg border border-white/10 flex items-center gap-2">
-                          <div className="w-6 h-6 rounded bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold">S</div>
-                          <span className="text-zinc-300">Escudo</span>
-                        </div>
-                        <div className="p-2 bg-white/5 rounded-lg border border-white/10 flex items-center gap-2">
-                          <div className="w-6 h-6 rounded bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold">R</div>
-                          <span className="text-zinc-300">Tiro Rápido</span>
-                        </div>
-                        <div className="p-2 bg-white/5 rounded-lg border border-white/10 flex items-center gap-2">
-                          <div className="w-6 h-6 rounded bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold">V</div>
-                          <span className="text-zinc-300">Velocidade</span>
-                        </div>
-                        <div className="p-2 bg-white/5 rounded-lg border border-white/10 flex items-center gap-2">
-                          <div className="w-6 h-6 rounded bg-orange-500/20 flex items-center justify-center text-orange-400 font-bold">T</div>
-                          <span className="text-zinc-300">Tiro Triplo</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {tutorialStep === 5 && (
-                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                      <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/30">
-                        <Trophy className="w-8 h-8 text-purple-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-4">Pronto para a Batalha!</h3>
-                      <p className="text-zinc-400 leading-relaxed">
-                        Vença seus oponentes, suba de nível e conquiste o topo do leaderboard. 
-                        Boa sorte, Tryharder!
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
-
-                <div className="mt-10 flex gap-4">
-                  {tutorialStep > 0 && (
-                    <button 
-                      onClick={() => setTutorialStep(prev => prev - 1)}
-                      className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-2xl border border-white/10 transition-all"
-                    >
-                      VOLTAR
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => {
-                      if (tutorialStep < 5) {
-                        setTutorialStep(prev => prev + 1);
-                      } else {
-                        setShowTutorial(false);
-                        setTutorialStep(0);
-                      }
-                    }}
-                    className="flex-[2] py-4 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/20 transition-all"
-                  >
-                    {tutorialStep === 5 ? "COMEÇAR AGORA" : "PRÓXIMO"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <button 
-                onClick={() => {
-                  setShowTutorial(false);
-                  setTutorialStep(0);
-                }}
-                className="absolute top-6 right-6 p-2 text-white/30 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </motion.div>
-          </motion.div>
+          <TutorialModal
+            showTutorial={showTutorial}
+            setShowTutorial={setShowTutorial}
+            tutorialStep={tutorialStep}
+            setTutorialStep={setTutorialStep}
+            isTouch={isTouch}
+          />
         )}
 
         {showSettings && (
-          <motion.div
-            key="settings-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md p-3"
-            onClick={() => setShowSettings(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.92, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative bg-gradient-to-b from-zinc-900/95 to-black/95 border border-white/10 rounded-2xl w-full max-w-[17rem] sm:max-w-xs shadow-[0_0_60px_rgba(188,19,254,0.15)] overflow-hidden"
-            >
-              {/* Glow accent */}
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-32 h-32 bg-[#bc13fe]/20 blur-[60px] rounded-full pointer-events-none" />
-
-              {/* Header */}
-              <div className="relative flex justify-between items-center px-4 py-3 border-b border-white/5">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#bc13fe]/20 border border-[#bc13fe]/30 flex items-center justify-center">
-                    <Settings size={14} className="text-[#bc13fe]" />
-                  </div>
-                  <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Ajustes</h2>
-                </div>
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
-                  aria-label="Fechar"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="relative p-3 space-y-1.5 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                {/* Nickname */}
-                <div className="flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <User className="w-3.5 h-3.5 text-[#bc13fe] shrink-0" />
-                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Nick</span>
-                  </div>
-                  <span className="text-xs font-black text-white tracking-wider truncate ml-2">{nickname || '...'}</span>
-                </div>
-
-                {/* Trophies */}
-                <div className="flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-3.5 h-3.5 text-[#ffea00]" />
-                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Troféus</span>
-                  </div>
-                  <span className="text-xs font-black text-white tracking-wider tabular-nums">{trophies}</span>
-                </div>
-
-                {/* Audio toggle */}
-                <button
-                  onClick={() => setIsMuted(!isMuted)}
-                  className="w-full flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    {isMuted
-                      ? <VolumeX className="w-3.5 h-3.5 text-red-500" />
-                      : <Volume2 className="w-3.5 h-3.5 text-[#00f2ff]" />}
-                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Áudio</span>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
-                    isMuted
-                      ? 'bg-red-500/15 text-red-400 border border-red-500/20'
-                      : 'bg-[#00f2ff]/15 text-[#00f2ff] border border-[#00f2ff]/20'
-                  }`}>
-                    {isMuted ? 'Mudo' : 'On'}
-                  </span>
-                </button>
-
-                {/* Quality */}
-                <div className="bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Maximize2 className="w-3.5 h-3.5 text-white/40" />
-                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Qualidade</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1">
-                    {deduplicateItems(['low', 'medium', 'high'] as GraphicQuality[], (q) => `quality-opt-${q}`, 'GraphicQualityOptions').map((q) => (
-                      <button
-                        key={`quality-opt-${q}`}
-                        onClick={() => setQuality(q)}
-                        className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all ${
-                          quality === q
-                            ? 'bg-[#bc13fe] border-[#bc13fe] text-white shadow-[0_0_12px_rgba(188,19,254,0.4)]'
-                            : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
-                        }`}
-                      >
-                        {q === 'low' ? 'Baixo' : q === 'medium' ? 'Méd' : 'Alto'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* HUD Customizer */}
-                <button
-                  onClick={() => {
-                    setShowSettings(false);
-                    setIsCustomizingHUD(true);
-                  }}
-                  className="w-full flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-xl px-3 py-2.5 transition-colors group"
-                >
-                  <div className="flex items-center gap-2">
-                    <Move className="w-3.5 h-3.5 text-[#00f2ff] group-hover:rotate-12 transition-transform" />
-                    <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">HUD Mobile</span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-white/30" />
-                </button>
-
-                {/* Save (primary) */}
-                <button
-                  onClick={saveSettings}
-                  className="w-full py-2.5 mt-2 bg-gradient-to-r from-[#bc13fe] to-[#8a00ff] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(188,19,254,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-                >
-                  Salvar Alterações
-                </button>
-
-                {/* Secondary actions */}
-                <div className="grid grid-cols-2 gap-1.5 pt-1.5 mt-1 border-t border-white/5">
-                  <button
-                    onClick={() => {
-                      setShowSettings(false);
-                      setShowPrivacyPolicy(true);
-                    }}
-                    className="py-2 bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-white/50 hover:text-white/80 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <ShieldCheck className="w-3 h-3" />
-                    Privacidade
-                  </button>
-                  <button
-                    onClick={handleInstallClick}
-                    className="py-2 bg-cyan-500/[0.08] hover:bg-cyan-500/15 border border-cyan-500/20 text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <Download className="w-3 h-3" />
-                    Instalar
-                  </button>
-                </div>
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full py-2 bg-red-500/[0.08] hover:bg-red-500/15 border border-red-500/20 text-red-400 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                >
-                  <X className="w-3 h-3" />
-                  Sair da Conta
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <SettingsModal
+            showSettings={showSettings}
+            setShowSettings={setShowSettings}
+            nickname={nickname}
+            trophies={trophies}
+            isMuted={isMuted}
+            setIsMuted={setIsMuted}
+            quality={quality}
+            setQuality={setQuality}
+            setIsCustomizingHUD={setIsCustomizingHUD}
+            saveSettings={saveSettings}
+            setShowPrivacyPolicy={setShowPrivacyPolicy}
+            handleInstallClick={handleInstallClick}
+            handleLogout={handleLogout}
+          />
         )}
 
         {showPrivacyPolicy && (
@@ -5215,453 +4084,44 @@ export default function App() {
         )}
 
         {showVictory && (
-          <motion.div 
-            key="victory-screen"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[160] flex items-center justify-center bg-black/95 backdrop-blur-3xl p-4 overflow-hidden"
-          >
-            <motion.div 
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-black/60 border border-yellow-400/30 p-12 rounded-[2rem] w-full max-w-lg text-center backdrop-blur-md relative"
-            >
-              <CornerDecoration className="text-yellow-400 -inset-4 opacity-100" />
-              
-              <motion.div
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <div className="relative inline-block mb-8">
-                  <div className="absolute -inset-8 bg-yellow-400/20 blur-[50px] rounded-full animate-pulse" />
-                  <Trophy className="w-32 h-32 text-[#ffea00] relative drop-shadow-[0_0_30px_rgba(255,234,0,0.8)]" />
-                </div>
-              </motion.div>
-
-              <motion.h2 
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                className="text-[#ffea00] text-7xl font-black uppercase tracking-tighter mb-4 italic drop-shadow-[0_0_15px_rgba(255,234,0,0.5)]"
-              >
-                {isLevel50Victory ? 'LENDA DA ARENA' : 'VITÓRIA TOTAL'}
-              </motion.h2>
-              
-              <div className="flex flex-col gap-2 mb-10">
-                <p className="text-white font-black uppercase tracking-[0.5em] text-xs">Simulação Concluída com Sucesso</p>
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-yellow-400/50 to-transparent" />
-              </div>
-              
-              <div className="grid grid-cols-1 gap-4 mb-12 max-w-xs mx-auto">
-                <motion.div
-                  initial={{ scale: 0, y: 20 }}
-                  animate={{ scale: 1, y: 0 }}
-                  transition={{ delay: 0.8, type: 'spring' }}
-                  className="bg-[#ffea00]/10 border border-[#ffea00]/30 p-6 rounded-2xl flex flex-col items-center shadow-[0_0_20px_rgba(255,234,0,0.2)]"
-                >
-                  <Trophy className="w-12 h-12 text-[#ffea00] mb-3" />
-                  <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Recompensa de Vitória</span>
-                  <span className="text-white font-black text-4xl italic">+{isLevel50Victory ? 50 : 25} <span className="text-[#ffea00] text-sm">TROFÉUS</span></span>
-                </motion.div>
-              </div>
-
-              <button
-                onClick={() => {
-                  setShowVictory(false);
-                  setGameState('menu');
-                }}
-                className="game-btn-primary w-full py-6 text-xl bg-yellow-400 !text-black hover:bg-yellow-300 shadow-[0_0_40px_rgba(255,234,0,0.4)]"
-              >
-                RETORNAR À BASE
-              </button>
-            </motion.div>
-            
-            {/* Celebration Particles */}
-            <div className="absolute inset-0 pointer-events-none">
-              {Array.from({ length: 40 }).map((_, i) => (
-                <motion.div
-                  key={`v-particle-${i}`}
-                  initial={{ 
-                    x: Math.random() * window.innerWidth, 
-                    y: window.innerHeight + 10,
-                    rotate: 0,
-                    opacity: 1
-                  }}
-                  animate={{ 
-                    y: -100,
-                    rotate: 360,
-                    opacity: 0
-                  }}
-                  transition={{ 
-                    duration: 3 + Math.random() * 4,
-                    repeat: Infinity,
-                    delay: Math.random() * 5
-                  }}
-                  className="absolute w-2 h-2 bg-yellow-400/40 rounded-sm"
-                />
-              ))}
-            </div>
-          </motion.div>
+          <VictoryScreen
+            setShowVictory={setShowVictory}
+            setGameState={setGameState}
+            isLevel50Victory={isLevel50Victory}
+          />
         )}
 
         {showRotatePrompt && (
-          <motion.div
-            key="rotate-prompt"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[400] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.85, y: 30, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              className="bg-gradient-to-b from-cyan-500/10 to-[#bc13fe]/10 border border-cyan-400/40 p-6 md:p-8 rounded-[2rem] w-full max-w-sm text-center backdrop-blur-xl relative shadow-[0_0_60px_rgba(0,242,255,0.25)]"
-            >
-              <CornerDecoration className="text-cyan-400 -inset-4 opacity-100" />
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
-
-              {/* Animated rotating phone icon */}
-              <div className="relative mx-auto mb-6 w-24 h-24">
-                <motion.div
-                  animate={{ rotate: [0, 90, 90, 0, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', times: [0, 0.4, 0.5, 0.9, 1] }}
-                  className="w-full h-full flex items-center justify-center"
-                >
-                  <Smartphone className="w-16 h-16 text-cyan-400 drop-shadow-[0_0_15px_rgba(0,242,255,0.6)]" strokeWidth={1.5} />
-                </motion.div>
-                <motion.div
-                  animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.6, 0.3] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="absolute inset-0 rounded-full border-2 border-cyan-400/40"
-                />
-              </div>
-
-              <div className="inline-block px-3 py-1 bg-cyan-500/20 border border-cyan-400/30 text-cyan-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4 italic">
-                Modo Paisagem
-              </div>
-
-              <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic mb-3 leading-tight">
-                Vire o celular na <span className="text-cyan-400">horizontal</span>
-              </h2>
-
-              <p className="text-white/60 text-sm font-medium mb-6 leading-relaxed">
-                O TryHard Academy foi feito para ser jogado em tela deitada. Incline o aparelho para iniciar.
-              </p>
-
-              <div className="flex flex-col gap-2.5">
-                <button
-                  onClick={() => {
-                    setShowRotatePrompt(false);
-                    if (pendingStartAction) {
-                      pendingStartAction();
-                      setPendingStartAction(null);
-                    }
-                  }}
-                  className="w-full bg-cyan-400 hover:bg-cyan-300 text-black font-black py-3.5 rounded-2xl text-sm uppercase tracking-[0.2em] transition-all active:scale-95 shadow-[0_0_30px_rgba(0,242,255,0.4)] flex items-center justify-center gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Virei! Começar
-                </button>
-                <button
-                  onClick={() => {
-                    setShowRotatePrompt(false);
-                    if (pendingStartAction) {
-                      pendingStartAction();
-                      setPendingStartAction(null);
-                    }
-                  }}
-                  className="w-full bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 font-bold py-2.5 rounded-2xl text-[10px] uppercase tracking-[0.3em] transition-all"
-                >
-                  Jogar de qualquer jeito
-                </button>
-              </div>
-
-              <p className="text-white/30 text-[9px] uppercase tracking-widest mt-4 font-bold">
-                O jogo detecta automaticamente quando você virar
-              </p>
-            </motion.div>
-          </motion.div>
+          <RotatePrompt
+            setShowRotatePrompt={setShowRotatePrompt}
+            pendingStartAction={pendingStartAction}
+            setPendingStartAction={setPendingStartAction}
+          />
         )}
 
         {showGameOver && (
-          <motion.div
-            key="game-over-screen"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-3 md:p-4 overflow-y-auto"
-            onClick={() => { setShowGameOver(false); setShowMatchIntro(false); setGameState('menu'); }}
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 40, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-sm md:max-w-md landscape:max-w-lg bg-gradient-to-b from-red-950/30 via-black/85 to-black/95 border-2 border-red-500/30 rounded-3xl landscape:rounded-2xl p-5 md:p-6 landscape:p-4 text-center shadow-[0_0_80px_rgba(239,68,68,0.25)] overflow-hidden my-auto"
-            >
-              {/* Background effects */}
-              <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-red-500/25 blur-[100px] rounded-full pointer-events-none" />
-              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-red-500 to-transparent" />
-              <CornerDecoration className="text-red-500/60 -inset-2" />
-
-              {/* Skull-style death icon */}
-              <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-                className="relative mx-auto mb-3 md:mb-4 landscape:mb-2 w-16 h-16 md:w-20 md:h-20 landscape:w-14 landscape:h-14 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.6)] border-2 border-red-400/50"
-              >
-                <Heart className="w-7 h-7 md:w-9 md:h-9 landscape:w-7 landscape:h-7 text-white fill-white" strokeWidth={0} />
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-black">
-                  <X className="w-3 h-3 text-black font-black" strokeWidth={4} />
-                </div>
-              </motion.div>
-
-              <div className="inline-block px-3 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 text-[8px] landscape:text-[9px] font-black uppercase tracking-[0.3em] mb-2 landscape:mb-1 rounded-full">
-                Sinal de Vida Perdido
-              </div>
-
-              <h2 className="text-red-500 text-4xl md:text-5xl landscape:text-3xl font-black uppercase tracking-tighter italic mb-1 landscape:mb-0 drop-shadow-[0_0_25px_rgba(239,68,68,0.5)] leading-none">
-                GAME <span className="text-white">OVER</span>
-              </h2>
-
-              {/* XP earned highlight */}
-              <div className="my-3 md:my-4 landscape:my-2 flex items-center justify-center gap-2">
-                <Zap className="w-4 h-4 landscape:w-3.5 landscape:h-3.5 text-yellow-400 fill-yellow-400" />
-                <span className="text-xs landscape:text-[10px] font-black uppercase tracking-widest text-yellow-400">+{stats.kills * 25 + survivalTime * 2} XP</span>
-                <div className="flex-1 max-w-[80px] h-1 bg-white/10 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, (stats.kills * 25 + survivalTime * 2) / 5)}%` }}
-                    transition={{ delay: 0.3, duration: 0.8 }}
-                    className="h-full bg-gradient-to-r from-yellow-400 to-[#bc13fe]"
-                  />
-                </div>
-              </div>
-
-              {/* Stats - horizontal on mobile, grid on landscape */}
-              <div className="grid grid-cols-3 gap-1.5 md:gap-2 landscape:gap-2 mb-4 md:mb-5 landscape:mb-3">
-                {[
-                  { label: 'Elims', val: stats.kills, icon: Target, color: 'from-cyan-500/20 to-cyan-500/5', iconColor: 'text-cyan-400', border: 'border-cyan-500/20' },
-                  { label: 'Tempo', val: `${survivalTime}s`, icon: Timer, color: 'from-yellow-500/20 to-yellow-500/5', iconColor: 'text-yellow-400', border: 'border-yellow-500/20' },
-                  { label: 'Recorde', val: highScore, icon: Trophy, color: 'from-[#bc13fe]/20 to-[#bc13fe]/5', iconColor: 'text-[#bc13fe]', border: 'border-[#bc13fe]/20' }
-                ].map((stat, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + i * 0.08 }}
-                    className={`relative bg-gradient-to-b ${stat.color} border ${stat.border} rounded-xl landscape:rounded-lg p-2.5 landscape:p-2 flex flex-col items-center gap-0.5 landscape:gap-0 backdrop-blur-sm`}
-                  >
-                    <stat.icon className={`w-4 h-4 landscape:w-3.5 landscape:h-3.5 ${stat.iconColor}`} />
-                    <span className="text-[8px] landscape:text-[7px] font-black text-white/40 uppercase tracking-widest">{stat.label}</span>
-                    <span className="text-lg landscape:text-base font-black text-white italic tabular-nums leading-none">{stat.val}</span>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* New record badge */}
-              {stats.kills > 0 && stats.kills >= highScore && (
-                <motion.div
-                  initial={{ scale: 0, rotate: -10 }}
-                  animate={{ scale: 1, rotate: -3 }}
-                  transition={{ delay: 0.5, type: 'spring' }}
-                  className="mb-3 landscape:mb-2 mx-auto inline-block px-3 py-1 bg-gradient-to-r from-[#bc13fe] to-pink-500 text-white text-[9px] landscape:text-[8px] font-black uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(188,19,254,0.5)]"
-                >
-                  ⭐ Novo Recorde!
-                </motion.div>
-              )}
-
-              {/* Actions */}
-              <div className="flex flex-col gap-2 landscape:gap-1.5">
-                <button
-                  onClick={handleRestart}
-                  className="w-full py-3.5 landscape:py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl text-sm landscape:text-xs font-black uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-red-400/50"
-                >
-                  <Zap className="w-4 h-4 fill-white" />
-                  REINICIAR
-                </button>
-                <button
-                  onClick={() => {
-                    setShowGameOver(false);
-                    setGameState('menu');
-                  }}
-                  className="w-full py-2.5 landscape:py-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-white/60 hover:text-white rounded-xl text-[10px] landscape:text-[9px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
-                >
-                  <ArrowLeft className="w-3 h-3" />
-                  Voltar ao Menu
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <GameOverScreen
+            showGameOver={showGameOver}
+            setShowGameOver={setShowGameOver}
+            setShowMatchIntro={setShowMatchIntro}
+            setGameState={setGameState}
+            stats={stats}
+            survivalTime={survivalTime}
+            highScore={highScore}
+            handleRestart={handleRestart}
+          />
         )}
 
         {showModal && currentQuestion && (
-          <motion.div
-            key="math-challenge"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-3 md:p-4 overflow-y-auto"
-            onClick={() => !feedback && handleAnswer(null as any)}
-          >
-            <motion.div
-              initial={{ scale: 0.92, y: 20 }}
-              animate={{
-                scale: 1,
-                y: 0,
-                x: feedback === 'wrong' || feedback === 'timeout' ? [0, -10, 10, -10, 10, 0] : 0
-              }}
-              transition={{ x: { duration: 0.4 } }}
-              onClick={(e) => e.stopPropagation()}
-              className={`relative w-full max-w-sm md:max-w-md landscape:max-w-lg bg-gradient-to-b ${
-                feedback === 'correct'
-                  ? 'from-green-950/30 via-black/85 to-black/95 border-green-500/50'
-                  : feedback === 'wrong' || feedback === 'timeout'
-                  ? 'from-red-950/30 via-black/85 to-black/95 border-red-500/50'
-                  : 'from-cyan-950/20 via-black/85 to-black/95 border-cyan-500/40'
-              } border-2 rounded-3xl landscape:rounded-2xl p-5 md:p-6 landscape:p-4 backdrop-blur-3xl overflow-hidden shadow-[0_0_60px_rgba(0,242,255,0.15)] my-auto`}
-            >
-              {/* Background effects */}
-              <div className={`absolute -top-16 left-1/2 -translate-x-1/2 w-40 h-40 blur-[80px] rounded-full pointer-events-none ${
-                feedback === 'correct' ? 'bg-green-500/30' :
-                feedback === 'wrong' || feedback === 'timeout' ? 'bg-red-500/30' : 'bg-cyan-500/20'
-              }`} />
-              <CornerDecoration className={`${
-                feedback === 'correct' ? 'text-green-500/60' :
-                feedback === 'wrong' || feedback === 'timeout' ? 'text-red-500/60' : 'text-cyan-400/60'
-              } -inset-2`} />
-
-              {/* Top row: difficulty pill + timer ring + combo */}
-              <div className="relative flex justify-between items-start mb-4 md:mb-5 landscape:mb-2">
-                <div className="flex flex-col gap-1.5 landscape:gap-1">
-                  {/* Difficulty pill */}
-                  <div className={`flex items-center gap-1.5 landscape:gap-1 px-2.5 py-1 landscape:px-2 landscape:py-0.5 rounded-full border backdrop-blur-sm w-fit ${
-                    currentQuestion.difficulty === 'easy' ? 'bg-green-500/10 border-green-500/30' :
-                    currentQuestion.difficulty === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
-                    'bg-red-500/10 border-red-500/30'
-                  }`}>
-                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                      currentQuestion.difficulty === 'easy' ? 'bg-green-400' :
-                      currentQuestion.difficulty === 'medium' ? 'bg-yellow-400' : 'bg-red-400'
-                    }`} />
-                    <span className={`text-[9px] landscape:text-[8px] font-black uppercase tracking-widest italic ${
-                      currentQuestion.difficulty === 'easy' ? 'text-green-400' :
-                      currentQuestion.difficulty === 'medium' ? 'text-yellow-400' : 'text-red-400'
-                    }`}>
-                      {currentQuestion.difficulty === 'easy' ? 'Fácil' :
-                       currentQuestion.difficulty === 'medium' ? 'Médio' : 'Crítico'}
-                    </span>
-                  </div>
-                  {/* Subject tag */}
-                  {currentQuestion.subject && (
-                    <div className="flex items-center gap-1 text-[8px] landscape:text-[7px] uppercase tracking-widest text-white/40 font-bold px-1">
-                      <BookOpen className="w-2.5 h-2.5" />
-                      <span>
-                        {currentQuestion.subject === 'math' ? 'Matemática' :
-                         currentQuestion.subject === 'portuguese' ? 'Português' :
-                         currentQuestion.subject === 'science' ? 'Ciências' :
-                         currentQuestion.subject === 'history' ? 'História' :
-                         currentQuestion.subject === 'geography' ? 'Geografia' : 'Conhecimento'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Circular timer */}
-                <div className="relative w-11 h-11 landscape:w-9 landscape:h-9 flex items-center justify-center">
-                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 36 36">
-                    <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/10" />
-                    <motion.circle
-                      cx="18" cy="18" r="15" fill="none" strokeWidth="2.5" strokeLinecap="round"
-                      className={timeLeft <= 3 ? 'text-red-500' : 'text-cyan-400'}
-                      style={{ filter: `drop-shadow(0 0 4px currentColor)` }}
-                      strokeDasharray="94.2"
-                      initial={false}
-                      animate={{ strokeDashoffset: 94.2 - (94.2 * timeLeft) / 30 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  </svg>
-                  <span className={`relative text-xs landscape:text-[10px] font-black tabular-nums ${
-                    timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-white'
-                  }`}>
-                    {timeLeft}
-                  </span>
-                </div>
-              </div>
-
-              {/* Combo Multiplier (floating) */}
-              <AnimatePresence>
-                {combo > 1 && !feedback && (
-                  <motion.div
-                    initial={{ scale: 0, rotate: -20 }}
-                    animate={{ scale: 1, rotate: 8 }}
-                    exit={{ scale: 0 }}
-                    className="absolute -top-2 right-1/2 translate-x-1/2 landscape:translate-x-0 landscape:right-4 landscape:top-2 bg-gradient-to-r from-[#bc13fe] to-pink-500 text-white px-3 py-1 landscape:px-2 landscape:py-0.5 rounded-full font-black text-[10px] landscape:text-[9px] shadow-[0_0_20px_rgba(188,19,254,0.6)] border border-white/30 z-20"
-                  >
-                    COMBO ×{combo}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Question text */}
-              <div className="relative text-center my-4 md:my-6 landscape:my-2">
-                <h2 className="text-4xl md:text-5xl landscape:text-3xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_20px_rgba(0,242,255,0.3)] leading-tight">
-                  {currentQuestion.text}
-                </h2>
-                {currentQuestion.explanation && feedback && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`mt-2 text-[10px] landscape:text-[9px] font-bold uppercase tracking-wider ${
-                      feedback === 'correct' ? 'text-green-400' : 'text-red-400'
-                    }`}
-                  >
-                    {currentQuestion.explanation}
-                  </motion.p>
-                )}
-              </div>
-
-              {/* Options grid - 2x2 (1 col on landscape) */}
-              <div className="relative grid grid-cols-2 landscape:grid-cols-4 gap-2 md:gap-3 landscape:gap-1.5">
-                {deduplicateItems(currentQuestion?.options || [], (opt) => `option-${currentQuestion?.id}-${opt}`, 'QuestionOptions').map((opt, i) => {
-                  const isCorrect = feedback === 'correct' && opt === currentQuestion?.answer;
-                  const isWrong = feedback === 'wrong' && opt === selectedOption;
-                  return (
-                    <motion.button
-                      key={`option-${currentQuestion?.id}-${opt}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      onClick={() => !feedback && handleAnswer(opt)}
-                      disabled={!!feedback}
-                      className={`relative py-4 md:py-5 landscape:py-2.5 text-lg md:text-2xl landscape:text-base font-black tabular-nums rounded-xl landscape:rounded-lg border-2 transition-all overflow-hidden ${
-                        isCorrect
-                          ? 'bg-green-500 border-green-400 text-white scale-[1.03] shadow-[0_0_30px_rgba(34,197,94,0.6)]'
-                          : isWrong
-                          ? 'bg-red-500 border-red-400 text-white shadow-[0_0_30px_rgba(239,68,68,0.6)]'
-                          : feedback && opt === currentQuestion?.answer
-                          ? 'bg-green-500/20 border-green-500/50 text-green-300'
-                          : 'bg-white/[0.04] border-white/10 text-white hover:bg-white/10 hover:border-cyan-400/50 hover:scale-[1.02]'
-                      }`}
-                    >
-                      {isCorrect && <CheckCircle2 className="absolute top-1 right-1 w-3 h-3 text-white" />}
-                      {isWrong && <X className="absolute top-1 right-1 w-3 h-3 text-white" />}
-                      <span className="relative">{opt}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              {/* Subtle scanline */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.06]">
-                <div className="w-full h-full" style={{
-                  backgroundImage: 'repeating-linear-gradient(0deg, #000 0px, #000 2px, transparent 2px, transparent 4px)',
-                  backgroundSize: '100% 4px'
-                }} />
-              </div>
-            </motion.div>
-          </motion.div>
+          <QuestionModal
+            showModal={showModal}
+            currentQuestion={currentQuestion}
+            feedback={feedback}
+            selectedOption={selectedOption}
+            timeLeft={timeLeft}
+            combo={combo}
+            handleAnswer={handleAnswer}
+          />
         )}
       </AnimatePresence>
 
@@ -5669,103 +4129,15 @@ export default function App() {
         <div className="fixed inset-0 z-[140] pointer-events-none" />
       )}
       {showMissionsMenu && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-6"
-        >
-          <motion.div 
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)]"
-          >
-            <div className="p-8 border-b border-white/10 flex justify-between items-center bg-zinc-900/80">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-cyan-500/20 rounded-2xl flex items-center justify-center border border-cyan-500/30">
-                  <Flag className="w-6 h-6 text-cyan-400" />
-                </div>
-                <div>
-                  <h2 className="text-3xl font-black uppercase tracking-tighter text-white italic">Missões <span className="text-cyan-400">Offline</span></h2>
-                  <p className="text-white/40 text-[10px] uppercase tracking-[0.3em] mt-1">Complete desafios para ganhar troféus</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowMissionsMenu(false)}
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 space-y-4 max-h-[60vh] custom-scrollbar">
-              {deduplicateItems(missions, (m) => `mission-menu-${m.id}`, 'MissionsMenu').map((mission, index) => (
-                <div 
-                  key={`mission-menu-${mission.id}`}
-                  className={`p-6 rounded-3xl border transition-all relative overflow-hidden group ${
-                    mission.completed 
-                      ? 'bg-green-500/5 border-green-500/20 opacity-60' 
-                      : index === currentMissionIndex 
-                        ? 'bg-cyan-500/10 border-cyan-500/40 shadow-[0_0_30px_rgba(0,242,255,0.1)]' 
-                        : 'bg-white/5 border-white/10 grayscale opacity-40'
-                  }`}
-                >
-                  {index === currentMissionIndex && !mission.completed && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.5)]" />
-                  )}
-                  
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className={`text-lg font-black uppercase tracking-tight ${mission.completed ? 'text-green-400' : 'text-white'}`}>
-                          {mission.title}
-                        </h3>
-                        {mission.completed && <CheckCircle2 className="w-5 h-5 text-green-400" />}
-                        {index === currentMissionIndex && !mission.completed && (
-                          <span className="px-2 py-0.5 bg-cyan-400 text-black text-[8px] font-black rounded-full uppercase tracking-widest animate-pulse">Ativa</span>
-                        )}
-                      </div>
-                      <p className="text-white/40 text-xs font-bold uppercase tracking-wider mb-4">{mission.description}</p>
-                      
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1 h-2 bg-black/40 rounded-full overflow-hidden border border-white/5">
-                          <motion.div 
-                            className={`h-full ${mission.completed ? 'bg-green-500' : 'bg-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.4)]'}`}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(100, (mission.current / mission.target) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-black text-white italic tabular-nums">
-                          {mission.current}/{mission.target}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="ml-6 flex flex-col items-end gap-2">
-                      <div className="text-[10px] font-black text-white/20 uppercase tracking-widest">Recompensa</div>
-                      <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10">
-                        <Trophy className="w-4 h-4 text-[#ffea00]" />
-                        <span className="text-sm font-black text-white">+{mission.reward}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="p-8 bg-zinc-900/80 border-t border-white/10 flex justify-center">
-              <button 
-                onClick={() => {
-                  setShowMissionsMenu(false);
-                  beginGameWithRotationCheck(() => { handleStartGame(); requestLandscape(); });
-                }}
-                className="bg-cyan-400 hover:bg-cyan-300 text-black px-12 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-95 shadow-[0_0_30px_rgba(0,242,255,0.3)]"
-              >
-                Jogar Agora
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
+        <MissionsMenu
+          showMissionsMenu={showMissionsMenu}
+          setShowMissionsMenu={setShowMissionsMenu}
+          missions={missions}
+          currentMissionIndex={currentMissionIndex}
+          beginGameWithRotationCheck={beginGameWithRotationCheck}
+          handleStartGame={handleStartGame}
+          requestLandscape={requestLandscape}
+        />
       )}
       <AnimatePresence>
         {showNotifications && (

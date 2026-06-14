@@ -10,7 +10,7 @@ export const db = getDatabase(app);
 export const firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 // Enable Firestore offline persistence for PWA offline support
-enableIndexedDbPersistence(firestore, { cacheSizeBytes: CACHE_SIZE_UNLIMITED }).catch((err) => {
+enableIndexedDbPersistence(firestore).catch((err) => {
   if (err.code === 'failed-precondition') {
     console.warn('[Firestore] Persistence failed: multiple tabs open');
   } else if (err.code === 'unimplemented') {
