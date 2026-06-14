@@ -288,32 +288,6 @@ export function MainMenuScreen({
         </div>
 
         <div className="flex items-center gap-2">
-          {playerData?.isVIP ? (
-            <div className="px-3 py-1 bg-yellow-500/15 border border-yellow-400/40 rounded-lg flex items-center gap-1.5 shadow-[0_0_12px_rgba(234,179,8,0.25)]">
-              <Crown className="w-3 h-3 text-yellow-400" />
-              <span className="text-[8px] font-black uppercase tracking-widest text-yellow-400">VIP Ilimitado</span>
-            </div>
-          ) : (
-            <div className={`px-3 py-1 rounded-lg flex items-center gap-1.5 border ${
-              remainingSeconds <= 60
-                ? 'bg-red-500/15 border-red-400/40 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
-                : remainingSeconds <= 300
-                ? 'bg-yellow-500/15 border-yellow-400/40 shadow-[0_0_12px_rgba(234,179,8,0.25)]'
-                : 'bg-white/5 border-white/10'
-            }`}>
-              <Timer className={`w-3 h-3 ${
-                remainingSeconds <= 60 ? 'text-red-400 animate-pulse' :
-                remainingSeconds <= 300 ? 'text-yellow-400' : 'text-cyan-400'
-              }`} />
-              <span className={`text-[8px] font-black uppercase tracking-widest tabular-nums ${
-                remainingSeconds <= 60 ? 'text-red-300' :
-                remainingSeconds <= 300 ? 'text-yellow-300' : 'text-white/60'
-              }`}>
-                {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')} grátis
-              </span>
-            </div>
-          )}
-
           {!isOnline && (
             <div className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
               <WifiOff size={10} className="text-red-400" />
@@ -384,31 +358,7 @@ export function MainMenuScreen({
               <ShoppingBag size={14} className="text-[#bc13fe]" />
             </motion.button>
 
-            {!playerData?.isVIP && (
-              <motion.button
-                whileHover={{ x: 6 }}
-                onClick={handleBuyVip}
-                className="w-full text-left py-3 px-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 hover:border-yellow-500 hover:bg-yellow-500/20 flex items-center justify-between group transition-all duration-300 relative overflow-hidden shadow-[0_0_15px_rgba(234,179,8,0.2)]"
-              >
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                <div>
-                  <span className="text-yellow-500 text-sm md:text-base font-black italic tracking-tighter uppercase leading-none block">SEJA VIP</span>
-                  <span className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest mt-0.5 block">Remover Limite de Tempo</span>
-                </div>
-                <Crown size={14} className="text-yellow-500 animate-pulse" />
-              </motion.button>
-            )}
-            {playerData?.isVIP && (
-              <motion.div
-                className="w-full py-2.5 px-4 rounded-xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/15 to-yellow-600/5 flex items-center gap-2"
-              >
-                <Crown className="w-4 h-4 text-yellow-400" />
-                <div>
-                  <div className="text-yellow-400 text-[10px] font-black uppercase tracking-widest">Tryhard VIP Ativo</div>
-                  <div className="text-yellow-500/60 text-[8px] font-bold uppercase tracking-widest">Jogo ilimitado todos os dias</div>
-                </div>
-              </motion.div>
-            )}
+
 
             <motion.button
               whileHover={{ x: 6 }}

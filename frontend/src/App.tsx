@@ -27,7 +27,6 @@ import { QuestionEngine, Question } from './game/questionEngine';
 import { LoadingScreen } from './components/LoadingScreen';
 import { MatchIntro } from './components/MatchIntro';
 import { BannedScreen } from './screens/BannedScreen';
-import { TimeLimitScreen } from './screens/TimeLimitScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
@@ -830,7 +829,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const joystickRef = useRef<HTMLDivElement>(null);
-  const playtimeRef = useRef<{ time: number, date: string, isVIP: boolean }>({ time: 0, date: '', isVIP: false });
+  const playtimeRef = useRef<{ time: number, date: string, isVIP: boolean }>({ time: 0, date: '', isVIP: true });
   const [userTypeSelection, setUserTypeSelection] = useState<'player' | 'teacher' | null>(null);
   const [isTouch, setIsTouch] = useState(false);
   const [gameState, setGameState] = useState<'auth' | 'menu' | 'playing' | 'lobby' | 'admin-panel' | 'teacher-panel' | 'banned' | 'time-limit'>('auth');
@@ -1399,7 +1398,7 @@ export default function App() {
       playtimeRef.current = {
         time: playerData.playtimeToday || 0,
         date: playerData.lastPlayedDate || new Date().toISOString().split('T')[0],
-        isVIP: playerData.isVIP || false
+        isVIP: true
       };
       // Reset warnings when VIP toggles on
       if (playerData.isVIP) {
@@ -3226,11 +3225,6 @@ export default function App() {
   // Wraps an "enter game" action with the mobile-rotate prompt + time-limit guard
   const beginGameWithRotationCheck = (action: () => void) => {
     triggerHaptic();
-    // Block if non-VIP user has exhausted today's free time
-    if (!playerData?.isVIP && remainingSeconds <= 0) {
-      setGameState('time-limit');
-      return;
-    }
     if (isTouch && !isLandscape) {
       setPendingStartAction(() => action);
       setShowRotatePrompt(true);
@@ -3697,18 +3691,7 @@ export default function App() {
           <BannedScreen auth={auth} />
         )}
 
-        {gameState === 'time-limit' && (
-          <TimeLimitScreen
-            handleBuyVip={handleBuyVip}
-            user={user}
-            isOnline={isOnline}
-            setGameState={setGameState}
-            setPlayerData={setPlayerData}
-            setPaymentReturnToast={setPaymentReturnToast}
-            auth={auth}
-            firestore={firestore}
-          />
-        )}
+
 
         {gameState === 'auth' && (
           <AuthScreen
