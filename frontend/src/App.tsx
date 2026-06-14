@@ -2157,7 +2157,14 @@ export default function App() {
       (game.player as any).nickname = nicknameRef.current;
       (game.player as any).trophies = playerDataRef.current?.trophies || 0;
       
-      if (currentRoom && currentRoom.players && currentRoom.players[currentUser.uid]) {
+      if (!currentRoom) {
+        // Single player mode: initialize level from Firestore
+        const savedLevel = playerDataRef.current?.level || 1;
+        game.level = savedLevel;
+        game.kills = 0;
+        game.killsToNextLevel = Math.min(100, savedLevel * 5 + 5);
+        game.player.level = savedLevel;
+      } else if (currentRoom.players && currentRoom.players[currentUser.uid]) {
         const pData = currentRoom.players[currentUser.uid];
         // Ensure lives are set correctly from room data, defaulting to 3
         game.player.lives = pData.lives !== undefined ? pData.lives : 3;
@@ -2283,8 +2290,19 @@ export default function App() {
       const baseTime = q.difficulty === 'hard' ? 10 : q.difficulty === 'medium' ? 8 : 6;
 
       if (!game.isMultiplayer) {
-        // Active challenge inside the match
-        game.startInGameQuestion(q);
+        // Randomly select between dynamic (orbs) and modal question modes
+        const isDynamic = Math.random() < 0.5;
+        if (isDynamic) {
+          game.startInGameQuestion(q);
+        } else {
+          // Modal multiple choice question
+          setCurrentQuestion(q);
+          setSelectedOption(null);
+          setFeedback(null);
+          setTimeLeft(baseTime * multiplier);
+          setShowModal(true);
+          game.paused = true;
+        }
       } else {
         // Fallback to modal in multiplayer
         setCurrentQuestion(q);
@@ -3378,6 +3396,20 @@ export default function App() {
         const uniqueNew = ammoParticles.filter(p => p && !existingIds.has(p.id));
         return [...prev, ...uniqueNew].filter(p => p).slice(-50);
       });
+
+      // Award Single Player Trophies, Powerups, and Kills Progress
+      if (!gameRef.current.isMultiplayer) {
+        const diffBonus = currentQuestion.difficulty === 'extreme' ? 15 : currentQuestion.difficulty === 'hard' ? 10 : currentQuestion.difficulty === 'medium' ? 5 : 2;
+        setTrophies(prev => prev + diffBonus);
+        awardTrophies(diffBonus);
+
+        const powerUpTypes = ['shield', 'rapid', 'speed', 'triple', 'bomb', 'magnet'];
+        const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+        gameRef.current.applyPowerUp(randomType as any);
+
+        gameRef.current.kills = (gameRef.current.kills || 0) + 1;
+        gameRef.current.totalKills = (gameRef.current.totalKills || 0) + 1;
+      }
       
       if (currentQuestion) {
         QuestionEngine.getInstance().recordPerformance(true, currentQuestion.difficulty);

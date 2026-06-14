@@ -1571,9 +1571,12 @@ export class Bot extends Player {
         this.botLevel = level;
         this.radius = 20;
         this.speed = 0.3 + (level * 0.03);
-        this.color = '#ff4d00'; // Neon Orange
-        this.glowColor = '#ff4d00';
-        this.trail.color = 'rgba(255, 77, 0, 0.3)';
+        
+        // Dynamically assign basic bot color based on level
+        const basicHue = (15 + level * 37) % 360;
+        this.color = `hsl(${basicHue}, 100%, 50%)`;
+        this.glowColor = this.color;
+        this.trail.color = `hsla(${basicHue}, 100%, 50%, 0.3)`;
         
         // Intelligent form change based on level
         if (level === 50) {
@@ -1600,9 +1603,12 @@ export class Bot extends Player {
             this.speed = 0.5;
             this.health = 2 + Math.floor(level / 4);
             this.maxHealth = this.health;
-            this.color = '#00ff00';
-            this.glowColor = '#00ff00';
-            this.trail.color = 'rgba(0, 255, 0, 0.3)';
+            
+            // Dynamically assign advanced bot color based on level
+            const advHue = (120 + level * 23) % 360;
+            this.color = `hsl(${advHue}, 100%, 50%)`;
+            this.glowColor = this.color;
+            this.trail.color = `hsla(${advHue}, 100%, 50%, 0.35)`;
         }
     }
 
@@ -3401,7 +3407,8 @@ export class Game {
     }
 
     private draw() {
-        this.ctx.fillStyle = '#10051a'; // Darker, theme-consistent base
+        const bgHue = (250 + this.level * 10) % 360;
+        this.ctx.fillStyle = `hsl(${bgHue}, 35%, 6%)`; // Deep space color shifting with level
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (this.gameState === 'loading') {
@@ -3751,7 +3758,7 @@ export class Game {
     }
 
     private spawnSuperBoss() {
-        const x = this.canvas.width / 2;
+        const x = WORLD_WIDTH / 2;
         const y = -300;
         const boss = new Bot(x, y, 100);
         boss.type = 'super_boss';
