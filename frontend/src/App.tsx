@@ -3254,7 +3254,8 @@ export default function App() {
   // Centralized VIP checkout call (used by time-limit screen, menu and rotate prompt)
   const handleBuyVip = async () => {
     try {
-      const response = await fetch((import.meta as any).env.VITE_API_URL + '/api/checkout', {
+      const apiUrl = (import.meta as any).env.VITE_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: user?.uid, email: user?.email })
